@@ -37,27 +37,29 @@
 		fat?: number;
 	} | null>(null);
 
-	const meals = getMeals();
-	const settings = getSettings();
-	const latestWeight = getLatestWeight();
+	const initialMeals = await getMeals();
+	const initialSettings = await getSettings();
+	const initialLatestWeight = await getLatestWeight();
+
+	const meals = $derived(getMeals().current ?? initialMeals);
+	const settings = $derived(getSettings().current ?? initialSettings);
+	const latestWeight = $derived(getLatestWeight().current ?? initialLatestWeight);
 
 	let currentDayMeals = $derived.by(() => {
-		if (!meals.current) return [];
 		const dateStr = formatDate(selectedDate);
-		return meals.current
+		return meals
 			.filter((m) => m.date === dateStr)
 			.sort((a, b) => b.timestamp - a.timestamp);
 	});
 
-	let calorieGoal = $derived(settings.current?.calorieGoal ?? 2200);
-	let weightGoal = $derived(settings.current?.weightGoal ?? null);
-	let weightUnit = $derived(settings.current?.weightUnit ?? 'lbs');
-	let currentWeight = $derived(latestWeight.current?.weight ?? null);
+	let calorieGoal = $derived(settings?.calorieGoal ?? 2200);
+	let weightGoal = $derived(settings?.weightGoal ?? null);
+	let weightUnit = $derived(settings?.weightUnit ?? 'lbs');
+	let currentWeight = $derived(latestWeight?.weight ?? null);
 
 	let history = $derived.by(() => {
-		if (!meals.current) return [];
 		const historyMap = new SvelteMap<string, number>();
-		meals.current.forEach((m) => {
+		meals.forEach((m) => {
 			const current = historyMap.get(m.date) || 0;
 			historyMap.set(m.date, current + m.calories);
 		});
@@ -95,7 +97,7 @@
 				fat: meal.fat,
 				imageKey: meal.imageKey,
 				mealTime: selectedDate.toISOString()
-			}).updates(meals);
+			}).updates(getMeals());
 
 			toast.success('Meal logged!');
 		} catch (err) {
@@ -113,7 +115,7 @@
 		fat?: number;
 	}) {
 		try {
-			await updateMeal(meal).updates(meals);
+			await updateMeal(meal).updates(getMeals());
 			toast.success('Meal updated');
 		} catch (err) {
 			console.error('Failed to update meal:', err);
@@ -123,7 +125,7 @@
 
 	async function handleDeleteMeal(id: string) {
 		try {
-			await deleteMeal(id).updates(meals);
+			await deleteMeal(id).updates(getMeals());
 			toast.success('Meal deleted');
 		} catch (err) {
 			console.error('Failed to delete meal:', err);
@@ -133,7 +135,7 @@
 
 	async function handleLogWeight(weight: number) {
 		try {
-			await logWeight({ weight }).updates(latestWeight);
+			await logWeight({ weight }).updates(getLatestWeight());
 			toast.success('Weight logged!');
 		} catch (err) {
 			console.error('Failed to log weight:', err);
@@ -246,13 +248,7 @@
 					</h2>
 
 					<div class="-mr-2 flex-1 overflow-y-auto pr-2 no-scrollbar">
-						{#if meals.loading}
-							<div class="flex justify-center py-8">
-								<div
-									class="border-primary h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"
-								></div>
-							</div>
-						{:else if currentDayMeals.length === 0}
+						{#if currentDayMeals.length === 0}
 							<div
 								class="text-muted-foreground bg-muted/10 border-muted rounded-3xl border border-dashed py-12 text-center"
 							>
@@ -425,6 +421,6 @@
 		currentWeightGoal={weightGoal}
 		{currentWeight}
 		{weightUnit}
-		onSave={() => settings.refresh()}
+		onSave={() => getSettings().refresh()}
 	/>
 </div>

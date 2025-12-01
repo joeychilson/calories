@@ -142,6 +142,51 @@ export const deleteMeal = command(z.string().uuid(), async (id) => {
 	return { success: true };
 });
 
+export const updateMeal = command(
+	z.object({
+		id: z.uuid(),
+		name: z.string().min(1),
+		calories: z.number().int().positive(),
+		protein: z.number().int().optional(),
+		carbs: z.number().int().optional(),
+		fat: z.number().int().optional()
+	}),
+	async (input) => {
+		const { locals } = getRequestEvent();
+		if (!locals.session || !locals.user) {
+			return error(401, 'Unauthorized');
+		}
+
+		const [updatedMeal] = await db
+			.update(mealLogs)
+			.set({
+				name: input.name,
+				calories: input.calories,
+				protein: input.protein,
+				carbs: input.carbs,
+				fat: input.fat
+			})
+			.where(and(eq(mealLogs.id, input.id), eq(mealLogs.userId, locals.user.id)))
+			.returning();
+
+		if (!updatedMeal) {
+			return error(404, 'Meal not found');
+		}
+
+		return {
+			id: updatedMeal.id,
+			name: updatedMeal.name,
+			calories: updatedMeal.calories,
+			protein: updatedMeal.protein,
+			carbs: updatedMeal.carbs,
+			fat: updatedMeal.fat,
+			image: updatedMeal.image ? getPresignedUrl(updatedMeal.image) : null,
+			date: updatedMeal.mealTime.toISOString().split('T')[0],
+			timestamp: updatedMeal.mealTime.getTime()
+		};
+	}
+);
+
 export const getMeals = query(async () => {
 	const { locals } = getRequestEvent();
 

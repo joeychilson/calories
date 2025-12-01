@@ -2,16 +2,18 @@
 	import CalorieRadialChart from '$lib/components/dashboard/calorie-radial-chart.svelte';
 	import AddMealDialog from '$lib/components/dialog/dialog-add-meal.svelte';
 	import DatePickerDialog from '$lib/components/dialog/dialog-date-picker.svelte';
+	import EditMealDialog from '$lib/components/dialog/dialog-edit-meal.svelte';
 	import LogWeightDialog from '$lib/components/dialog/dialog-log-weight.svelte';
 	import SettingsDialog from '$lib/components/dialog/dialog-settings.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { addMeal, deleteMeal, getMeals } from '$lib/remote/meals.remote';
+	import { addMeal, deleteMeal, getMeals, updateMeal } from '$lib/remote/meals.remote';
 	import { getLatestWeight, getSettings, logWeight } from '$lib/remote/weight.remote';
 	import { formatDate, getDisplayDate } from '$lib/utils/format';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
@@ -22,9 +24,18 @@
 
 	const selectedDate = new SvelteDate();
 	let isAddModalOpen = $state(false);
+	let isEditModalOpen = $state(false);
 	let isDatePickerOpen = $state(false);
 	let isWeightModalOpen = $state(false);
 	let isSettingsOpen = $state(false);
+	let editingMeal = $state<{
+		id: string;
+		name: string;
+		calories: number;
+		protein?: number;
+		carbs?: number;
+		fat?: number;
+	} | null>(null);
 
 	const meals = getMeals();
 	const settings = getSettings();
@@ -90,6 +101,23 @@
 		} catch (err) {
 			console.error('Failed to add meal:', err);
 			toast.error('Failed to log meal');
+		}
+	}
+
+	async function handleUpdateMeal(meal: {
+		id: string;
+		name: string;
+		calories: number;
+		protein?: number;
+		carbs?: number;
+		fat?: number;
+	}) {
+		try {
+			await updateMeal(meal).updates(meals);
+			toast.success('Meal updated');
+		} catch (err) {
+			console.error('Failed to update meal:', err);
+			toast.error('Failed to update meal');
 		}
 	}
 
@@ -289,6 +317,22 @@
 															</DropdownMenu.Trigger>
 															<DropdownMenu.Content align="end">
 																<DropdownMenu.Item
+																	onclick={() => {
+																		editingMeal = {
+																			id: meal.id,
+																			name: meal.name,
+																			calories: meal.calories,
+																			protein: meal.protein ?? undefined,
+																			carbs: meal.carbs ?? undefined,
+																			fat: meal.fat ?? undefined
+																		};
+																		isEditModalOpen = true;
+																	}}
+																>
+																	<PencilIcon class="mr-2 size-4" />
+																	Edit
+																</DropdownMenu.Item>
+																<DropdownMenu.Item
 																	class="text-destructive focus:text-destructive"
 																	onclick={() => handleDeleteMeal(meal.id)}
 																>
@@ -364,6 +408,7 @@
 	</div>
 
 	<AddMealDialog bind:open={isAddModalOpen} onAdd={handleAddMeal} />
+	<EditMealDialog bind:open={isEditModalOpen} meal={editingMeal} onSave={handleUpdateMeal} />
 	<DatePickerDialog bind:open={isDatePickerOpen} date={selectedDate} {history} />
 	<LogWeightDialog
 		bind:open={isWeightModalOpen}

@@ -156,6 +156,20 @@
 					</div>
 				</div>
 			</div>
+			<div class="grid grid-cols-3 gap-3">
+				<div class="space-y-2">
+					<Label for="protein" class="text-xs text-muted-foreground">Protein (g)</Label>
+					<Input id="protein" type="number" placeholder="0" class="text-center" />
+				</div>
+				<div class="space-y-2">
+					<Label for="carbs" class="text-xs text-muted-foreground">Carbs (g)</Label>
+					<Input id="carbs" type="number" placeholder="0" class="text-center" />
+				</div>
+				<div class="space-y-2">
+					<Label for="fat" class="text-xs text-muted-foreground">Fat (g)</Label>
+					<Input id="fat" type="number" placeholder="0" class="text-center" />
+				</div>
+			</div>
 		</div>
 		<Button
 			onclick={handleSubmit}

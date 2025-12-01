@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, real, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const users = pgTable(
 	'users',
@@ -85,4 +85,76 @@ export const verifications = pgTable(
 			.notNull()
 	},
 	(table) => [index('verifications_identifier_idx').on(table.identifier)]
+);
+
+export const settings = pgTable(
+	'settings',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: uuid('user_id')
+			.notNull()
+			.unique()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		calorieGoal: integer('calorie_goal').default(2200).notNull(),
+		weightGoal: real('weight_goal'),
+		weightUnit: text('weight_unit').default('lbs').notNull(),
+		createdAt: timestamp('created_at')
+			.$defaultFn(() => new Date())
+			.notNull(),
+		updatedAt: timestamp('updated_at')
+			.$defaultFn(() => new Date())
+			.notNull()
+	},
+	(table) => [index('settings_user_id_idx').on(table.userId)]
+);
+
+export const mealLogs = pgTable(
+	'meal_logs',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		calories: integer('calories').notNull(),
+		protein: integer('protein'),
+		carbs: integer('carbs'),
+		fat: integer('fat'),
+		sodium: integer('sodium'),
+		cholesterol: integer('cholesterol'),
+		fiber: integer('fiber'),
+		sugar: integer('sugar'),
+		mealType: text('meal_type'),
+		image: text('image'),
+		mealTime: timestamp('meal_time').notNull(),
+		createdAt: timestamp('created_at')
+			.$defaultFn(() => new Date())
+			.notNull(),
+		updatedAt: timestamp('updated_at')
+			.$defaultFn(() => new Date())
+			.notNull()
+	},
+	(table) => [
+		index('meals_user_id_idx').on(table.userId),
+		index('meals_meal_time_idx').on(table.mealTime)
+	]
+);
+
+export const weightLogs = pgTable(
+	'weight_logs',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		weight: real('weight').notNull(),
+		date: timestamp('date').notNull(),
+		createdAt: timestamp('created_at')
+			.$defaultFn(() => new Date())
+			.notNull(),
+		updatedAt: timestamp('updated_at')
+			.$defaultFn(() => new Date())
+			.notNull()
+	},
+	(table) => [index('weight_logs_user_id_idx').on(table.userId)]
 );

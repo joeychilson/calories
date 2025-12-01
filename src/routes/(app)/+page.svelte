@@ -1,52 +1,69 @@
 <script lang="ts">
 	import AddMealDialog from '$lib/components/dialog/dialog-add-meal.svelte';
 	import DatePickerDialog from '$lib/components/dialog/dialog-date-picker.svelte';
+	import LogWeightDialog from '$lib/components/dialog/dialog-log-weight.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
-	import { ChartContainer, type ChartConfig } from '$lib/components/ui/chart';
 	import { formatDate, getDisplayDate } from '$lib/utils/format';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import TrendingDownIcon from '@lucide/svelte/icons/trending-down';
+	import TrendingUpIcon from '@lucide/svelte/icons/trending-up';
 	import UtensilsIcon from '@lucide/svelte/icons/utensils';
-	import { ArcChart, Text } from 'layerchart';
 	import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
 	type Meal = {
 		id: string;
 		name: string;
 		calories: number;
+		protein?: number;
+		carbs?: number;
+		fat?: number;
 		image: string | null;
 		date: string;
 		timestamp: number;
 	};
 
+	let settings = $state({
+		calorieGoal: 2200,
+		weightGoal: 165,
+		weightUnit: 'lbs',
+		currentWeight: 172.4
+	});
+
 	const selectedDate = new SvelteDate();
 	let isAddModalOpen = $state(false);
 	let isDatePickerOpen = $state(false);
+	let isWeightModalOpen = $state(false);
 
 	let meals = $state<Meal[]>([
 		{
 			id: 'prev-1',
-			name: 'Oatmeal',
+			name: 'Oatmeal & Berries',
 			calories: 350,
+			protein: 12,
+			carbs: 45,
+			fat: 6,
 			image: null,
 			date: formatDate(new Date(Date.now() - 86400000)),
 			timestamp: Date.now() - 86400000
 		},
 		{
 			id: 'prev-2',
-			name: 'Salad',
-			calories: 400,
+			name: 'Chicken Salad',
+			calories: 450,
+			protein: 45,
+			carbs: 10,
+			fat: 20,
 			image: null,
 			date: formatDate(new Date(Date.now() - 86400000)),
 			timestamp: Date.now() - 86300000
 		}
 	]);
-
-	const dailyGoal = 2200;
 
 	let currentDayMeals = $derived.by(() => {
 		const dateStr = formatDate(selectedDate);
@@ -57,23 +74,8 @@
 		return currentDayMeals.reduce((acc, curr) => acc + curr.calories, 0);
 	});
 
-	let remainingCalories = $derived(dailyGoal - totalCalories);
-	let isOver = $derived(totalCalories > dailyGoal);
-
-	let chartData = $derived([
-		{
-			name: 'calories',
-			value: totalCalories,
-			fill: isOver ? 'var(--destructive)' : 'var(--primary)'
-		}
-	]);
-
-	const chartConfig = {
-		calories: {
-			label: 'Calories',
-			color: 'var(--primary)'
-		}
-	} satisfies ChartConfig;
+	let remainingCalories = $derived(settings.calorieGoal - totalCalories);
+	let isOver = $derived(totalCalories > settings.calorieGoal);
 
 	let history = $derived.by(() => {
 		const historyMap = new SvelteMap<string, number>();
@@ -85,9 +87,9 @@
 		return Array.from(historyMap.entries()).map(([date, cals]) => ({
 			date,
 			status:
-				cals > dailyGoal
+				cals > settings.calorieGoal
 					? 'over'
-					: ((cals > dailyGoal * 0.8 ? 'met' : 'under') as 'over' | 'met' | 'under')
+					: ((cals > settings.calorieGoal * 0.8 ? 'met' : 'under') as 'over' | 'met' | 'under')
 		}));
 	});
 
@@ -108,13 +110,17 @@
 	function handleDeleteMeal(id: string) {
 		meals = meals.filter((m) => m.id !== id);
 	}
+
+	function handleUpdateWeight(newWeight: number) {
+		settings.currentWeight = newWeight;
+	}
 </script>
 
-<div class="bg-muted/20 min-h-screen pb-28 font-sans pt-14">
+<div class="bg-muted/20 min-h-screen pb-32 font-sans pt-14">
 	<header
-		class="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-14 z-10 px-4 pt-4 pb-2 backdrop-blur-xl border-b border-border/5"
+		class="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-20 px-4 pt-4 pb-2 backdrop-blur-xl border-b border-border/5"
 	>
-		<div class="mx-auto flex max-w-md items-center justify-between">
+		<div class="mx-auto flex max-w-md items-center justify-between relative">
 			<Button
 				variant="ghost"
 				size="icon"
@@ -125,7 +131,7 @@
 			</Button>
 
 			<button
-				class="flex flex-col items-center cursor-pointer group rounded-lg px-3 py-1 hover:bg-muted/50 transition-colors"
+				class="flex flex-col items-center cursor-pointer group rounded-xl px-4 py-1 hover:bg-muted/50 transition-all active:scale-95"
 				onclick={() => (isDatePickerOpen = true)}
 			>
 				<span class="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">
@@ -148,146 +154,176 @@
 			>
 				<ChevronRightIcon class="size-5 text-muted-foreground" />
 			</Button>
+
+			<div class="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
+				<!-- Desktop only settings placeholder if needed -->
+			</div>
 		</div>
 	</header>
 
-	<main class="mx-auto max-w-md px-4 pt-6">
-		<div class="animate-in fade-in zoom-in duration-500 mb-8">
-			<Card class="bg-transparent border-none shadow-none">
-				<CardContent class="p-0">
-					<ChartContainer
-						config={chartConfig}
-						class="mx-auto aspect-square h-64 w-64 max-h-[250px]"
-					>
-						<ArcChart
-							data={chartData}
-							series={chartData.map((d) => ({
-								key: d.name,
-								color: d.fill,
-								data: [d]
-							}))}
-							label="name"
-							value="value"
-							outerRadius={88}
-							innerRadius={66}
-							trackOuterRadius={83}
-							trackInnerRadius={72}
-							padding={0}
-							range={[90, -270]}
-							maxValue={dailyGoal}
-							props={{
-								arc: { track: { fill: 'var(--muted)' }, motion: 'tween' },
-								tooltip: { context: { hideDelay: 350 } }
-							}}
-							tooltip={false}
-						>
-							{#snippet belowMarks()}
-								<circle cx="0" cy="0" r="80" class="fill-background" />
-							{/snippet}
-							{#snippet aboveMarks()}
-								<Text
-									value={String(totalCalories)}
-									textAnchor="middle"
-									verticalAnchor="middle"
-									class="fill-foreground text-5xl! font-bold tracking-tighter"
-									dy={4}
-								/>
-								<Text
-									value={`/ ${dailyGoal} kcal`}
-									textAnchor="middle"
-									verticalAnchor="middle"
-									class="fill-muted-foreground! text-[10px] font-bold uppercase tracking-widest"
-									dy={26}
-								/>
-							{/snippet}
-						</ArcChart>
-					</ChartContainer>
+	<main class="mx-auto max-w-md px-4 pt-6 space-y-8">
+		<div class="animate-in fade-in zoom-in duration-500 space-y-6">
+			<Card
+				class="bg-background/50 border-none shadow-sm backdrop-blur-sm overflow-visible relative"
+			>
+				<CardContent class="p-6 pb-2">
+					<div class="flex items-center justify-between mb-2">
+						<div>
+							<h3 class="text-sm font-medium text-muted-foreground">Calories</h3>
+						</div>
+						<div class="text-right">
+							<div class="text-sm font-medium text-muted-foreground">Goal</div>
+						</div>
+					</div>
+
+					<div class="flex items-end justify-between">
+						<div>
+							<span class="text-4xl font-bold tracking-tighter block leading-none"
+								>{totalCalories}</span
+							>
+						</div>
+						<div class="text-right">
+							<span class="text-xl font-bold text-muted-foreground block leading-none"
+								>{settings.calorieGoal}</span
+							>
+						</div>
+					</div>
+
+					<div class="mt-4 h-3 w-full bg-muted/50 rounded-full overflow-hidden">
+						<div
+							class="h-full rounded-full transition-all duration-1000 ease-out {isOver
+								? 'bg-destructive'
+								: 'bg-primary'}"
+							style="width: {Math.min((totalCalories / settings.calorieGoal) * 100, 100)}%"
+						></div>
+					</div>
+
+					<div class="mt-2 flex justify-between text-xs text-muted-foreground font-medium">
+						<span>0</span>
+						<span>{remainingCalories} left</span>
+					</div>
 				</CardContent>
 			</Card>
 
-			<div class="mt-8 grid grid-cols-3 gap-4 text-center">
-				<div class="bg-card/50 rounded-2xl p-3 backdrop-blur-sm">
-					<p class="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">Eaten</p>
-					<p class="text-foreground text-xl font-bold">{totalCalories}</p>
-				</div>
-				<div class="bg-card/50 rounded-2xl p-3 backdrop-blur-sm">
-					<p class="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">Goal</p>
-					<p class="text-foreground text-xl font-bold">{dailyGoal}</p>
-				</div>
-				<div class="bg-card/50 rounded-2xl p-3 backdrop-blur-sm">
-					<p class="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">Left</p>
-					<p
-						class="text-xl font-bold {remainingCalories < 0
-							? 'text-destructive'
-							: 'text-emerald-500'}"
-					>
-						{remainingCalories}
-					</p>
+			<div class="grid grid-cols-2 gap-4">
+				<button
+					class="bg-card hover:bg-accent/50 transition-colors rounded-2xl p-4 border shadow-sm text-left relative group"
+					onclick={() => (isWeightModalOpen = true)}
+				>
+					<div class="flex items-center gap-2 mb-2">
+						<ScaleIcon class="size-4 text-indigo-500" />
+						<span class="text-xs font-bold uppercase tracking-wider text-muted-foreground"
+							>Weight</span
+						>
+					</div>
+					<div class="flex items-baseline gap-1">
+						<span class="text-2xl font-bold tracking-tight">{settings.currentWeight}</span>
+						<span class="text-xs font-medium text-muted-foreground">{settings.weightUnit}</span>
+					</div>
+					<div class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+						{#if settings.currentWeight > settings.weightGoal}
+							<TrendingDownIcon class="size-3 text-emerald-500" />
+							<span class="text-emerald-500 font-medium"
+								>{(settings.currentWeight - settings.weightGoal).toFixed(1)} to go</span
+							>
+						{:else}
+							<TrendingUpIcon class="size-3 text-emerald-500" />
+							<span class="text-emerald-500 font-medium">Goal Met!</span>
+						{/if}
+					</div>
+					<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+						<PlusIcon class="size-4 text-muted-foreground" />
+					</div>
+				</button>
+
+				<div class="bg-card rounded-2xl p-4 border shadow-sm text-left">
+					<div class="flex items-center gap-2 mb-2">
+						<div class="size-4 rounded-full bg-orange-500/20 flex items-center justify-center">
+							<div class="size-2 rounded-full bg-orange-500"></div>
+						</div>
+						<span class="text-xs font-bold uppercase tracking-wider text-muted-foreground"
+							>Streak</span
+						>
+					</div>
+					<div class="flex items-baseline gap-1">
+						<span class="text-2xl font-bold tracking-tight">12</span>
+						<span class="text-xs font-medium text-muted-foreground">days</span>
+					</div>
+					<p class="text-xs text-muted-foreground mt-1">Keep it up!</p>
 				</div>
 			</div>
 		</div>
+
 		<div class="space-y-4">
-			<div class="flex items-center justify-between">
+			<div class="flex items-center justify-between px-1">
 				<h2 class="text-foreground flex items-center gap-2 text-lg font-bold">
-					Meals <span
-						class="bg-primary/10 text-primary rounded-full px-2.5 py-0.5 text-xs font-bold"
-						>{currentDayMeals.length}</span
-					>
+					Meals Today
+					<span class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-bold">
+						{currentDayMeals.length}
+					</span>
 				</h2>
 			</div>
+
 			{#if currentDayMeals.length === 0}
 				<div
-					class="bg-card/50 border-muted/40 flex flex-col items-center justify-center rounded-3xl border-2 border-dashed py-16 text-center"
+					class="bg-muted/30 border-dashed border-2 border-muted rounded-3xl py-16 flex flex-col items-center justify-center text-center"
 				>
-					<div
-						class="bg-muted text-muted-foreground mb-4 flex h-16 w-16 items-center justify-center rounded-full"
-					>
-						<UtensilsIcon class="size-7" />
+					<div class="bg-background p-4 rounded-full shadow-sm mb-4">
+						<UtensilsIcon class="size-6 text-muted-foreground" />
 					</div>
-					<p class="text-muted-foreground font-medium">No meals logged today</p>
+					<p class="text-muted-foreground font-medium">No meals logged yet.</p>
+					<p class="text-xs text-muted-foreground/60 mt-1">Tap the + button to start.</p>
 				</div>
 			{:else}
-				<div class="space-y-3">
+				<div class="space-y-3 pb-4">
 					{#each currentDayMeals as meal (meal.id)}
 						<div
-							class="bg-card hover:border-primary/20 group relative overflow-hidden rounded-2xl border shadow-sm transition-all"
+							class="bg-card hover:bg-accent/50 group relative overflow-hidden rounded-2xl border shadow-sm transition-all"
 						>
 							<div class="flex gap-4 p-3">
-								<div class="bg-muted relative h-20 w-20 shrink-0 overflow-hidden rounded-xl">
+								<div class="bg-muted relative h-16 w-16 shrink-0 overflow-hidden rounded-xl">
 									{#if meal.image}
-										<img
-											src={meal.image}
-											alt={meal.name}
-											class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-										/>
+										<img src={meal.image} alt={meal.name} class="h-full w-full object-cover" />
 									{:else}
 										<div
 											class="text-muted-foreground flex h-full w-full items-center justify-center"
 										>
-											<UtensilsIcon class="size-6" />
+											<UtensilsIcon class="size-5" />
 										</div>
 									{/if}
 								</div>
-								<div class="flex flex-1 flex-col justify-center gap-1">
-									<h3 class="text-foreground truncate pr-8 font-bold leading-none">{meal.name}</h3>
-									<div class="flex items-baseline gap-1">
-										<p class="text-primary text-lg font-bold leading-none">
-											{meal.calories}
-										</p>
-										<span class="text-muted-foreground text-xs font-medium">kcal</span>
+								<div class="flex flex-1 flex-col justify-center gap-1 min-w-0">
+									<div class="flex items-start justify-between gap-2">
+										<h3 class="text-foreground truncate font-bold leading-tight">{meal.name}</h3>
+										<span class="text-primary font-bold whitespace-nowrap"
+											>{meal.calories} kcal</span
+										>
 									</div>
-									<p class="text-muted-foreground text-xs font-medium">
-										{new Date(meal.timestamp).toLocaleTimeString([], {
-											hour: '2-digit',
-											minute: '2-digit'
-										})}
-									</p>
+
+									{#if meal.protein || meal.carbs || meal.fat}
+										<div class="flex gap-3 text-xs text-muted-foreground">
+											{#if meal.protein}<span>{meal.protein}p</span>{/if}
+											{#if meal.carbs}<span>{meal.carbs}c</span>{/if}
+											{#if meal.fat}<span>{meal.fat}f</span>{/if}
+										</div>
+									{:else}
+										<p class="text-muted-foreground text-xs">
+											{new Date(meal.timestamp)
+												.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+												.toLowerCase()}
+										</p>
+									{/if}
 								</div>
+
 								<button
 									onclick={() => handleDeleteMeal(meal.id)}
-									class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 absolute top-2 right-2 rounded-full p-2 opacity-0 transition-all group-hover:opacity-100 focus:opacity-100"
+									class="absolute inset-y-0 right-0 w-16 bg-linear-to-l from-background to-transparent flex items-center justify-end pr-3 opacity-0 group-hover:opacity-100 transition-opacity"
 								>
-									<Trash2Icon class="size-4" />
+									<div
+										class="bg-destructive/10 hover:bg-destructive p-2 rounded-full text-destructive hover:text-white transition-colors"
+									>
+										<Trash2Icon class="size-4" />
+									</div>
 								</button>
 							</div>
 						</div>
@@ -296,16 +332,24 @@
 			{/if}
 		</div>
 	</main>
-	<div class="fixed bottom-6 left-0 right-0 z-20 flex justify-center pointer-events-none">
+
+	<div class="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-4">
 		<Button
 			size="lg"
-			class="bg-foreground text-background hover:bg-foreground/90 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 h-14 rounded-full px-8 shadow-lg shadow-black/5 transition-all hover:scale-105 hover:shadow-xl active:scale-95 pointer-events-auto"
+			class="h-16 rounded-full px-8 shadow-xl shadow-primary/20 transition-transform hover:scale-105 active:scale-95 bg-primary text-primary-foreground"
 			onclick={() => (isAddModalOpen = true)}
 		>
-			<PlusIcon class="mr-2 size-5 stroke-3" />
-			<span class="text-base font-bold">Log Meal</span>
+			<PlusIcon class="mr-2 size-6 stroke-3" />
+			<span class="text-lg font-bold">Log Meal</span>
 		</Button>
 	</div>
+
 	<AddMealDialog bind:open={isAddModalOpen} onAdd={handleAddMeal} />
 	<DatePickerDialog bind:open={isDatePickerOpen} date={selectedDate} {history} />
+	<LogWeightDialog
+		bind:open={isWeightModalOpen}
+		onSave={handleUpdateWeight}
+		currentWeight={settings.currentWeight}
+		unit={settings.weightUnit}
+	/>
 </div>

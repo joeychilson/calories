@@ -5,17 +5,20 @@
 	import LogWeightDialog from '$lib/components/dialog/dialog-log-weight.svelte';
 	import SettingsDialog from '$lib/components/dialog/dialog-settings.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { addMeal, deleteMeal, getMeals } from '$lib/remote/meals.remote';
 	import { getLatestWeight, getSettings, logWeight } from '$lib/remote/weight.remote';
 	import { formatDate, getDisplayDate } from '$lib/utils/format';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import UtensilsIcon from '@lucide/svelte/icons/utensils';
 	import { toast } from 'svelte-sonner';
 	import { SvelteDate, SvelteMap } from 'svelte/reactivity';
+	import { slide } from 'svelte/transition';
 
 	const selectedDate = new SvelteDate();
 	let isAddModalOpen = $state(false);
@@ -108,6 +111,12 @@
 			console.error('Failed to log weight:', err);
 			toast.error('Failed to log weight');
 		}
+	}
+	function formatTime(timestamp: number) {
+		return new Date(timestamp).toLocaleTimeString([], {
+			hour: 'numeric',
+			minute: '2-digit'
+		});
 	}
 </script>
 
@@ -215,62 +224,121 @@
 							</div>
 						{:else if currentDayMeals.length === 0}
 							<div
-								class="text-muted-foreground bg-muted/10 border-muted rounded-3xl border border-dashed py-8 text-center"
+								class="text-muted-foreground bg-muted/10 border-muted rounded-3xl border border-dashed py-12 text-center"
 							>
-								<p>No meals logged yet.</p>
+								<div
+									class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted"
+								>
+									<UtensilsIcon class="size-6 opacity-50" />
+								</div>
+								<p class="font-medium">No meals logged yet</p>
+								<p class="text-sm text-muted-foreground">Add your first meal to start tracking</p>
 							</div>
 						{:else}
 							<div class="space-y-3 pb-4">
 								{#each currentDayMeals as meal, i (meal.id)}
 									<div
-										class="bg-card hover:border-border group relative flex items-center gap-4 rounded-2xl border border-border/40 p-2 pr-4 shadow-sm transition-all hover:shadow-md"
+										transition:slide={{ duration: 200 }}
+										class="group relative flex flex-col gap-3 rounded-3xl bg-card/50 p-4 transition-all hover:bg-muted/50 sm:flex-row sm:items-center sm:gap-6"
 									>
-										<!-- Indicator Dot -->
-										<div
-											class="h-12 w-1 shrink-0 rounded-full"
-											style="background-color: var(--chart-{(i % 5) + 1})"
-										></div>
-
-										<!-- Image -->
-										<div class="bg-muted h-12 w-12 shrink-0 overflow-hidden rounded-xl">
-											{#if meal.image}
-												<img src={meal.image} alt={meal.name} class="h-full w-full object-cover" />
-											{:else}
-												<div class="flex h-full w-full items-center justify-center">
-													<UtensilsIcon class="text-muted-foreground size-4" />
-												</div>
-											{/if}
-										</div>
-
-										<!-- Info -->
-										<div class="flex-1 min-w-0 py-1">
-											<div class="flex items-center justify-between">
-												<h3 class="truncate pr-2 font-medium">{meal.name}</h3>
-												<span class="whitespace-nowrap text-sm font-bold">{meal.calories}</span>
-											</div>
-											<div class="mt-0.5 flex items-center justify-between">
-												<div class="text-muted-foreground flex gap-2 text-xs">
-													{#if meal.protein}<span>{meal.protein}p</span>{/if}
-													{#if meal.carbs}<span>{meal.carbs}c</span>{/if}
-													{#if meal.fat}<span>{meal.fat}f</span>{/if}
-													{#if !meal.protein && !meal.carbs && !meal.fat}
-														<span>
-															{new Date(meal.timestamp)
-																.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-																.toLowerCase()}
-														</span>
+										<!-- Main Row -->
+										<div class="flex flex-1 items-start gap-4">
+											<!-- Image -->
+											<div class="relative shrink-0">
+												<div
+													class="h-16 w-16 overflow-hidden rounded-2xl bg-muted shadow-sm sm:h-14 sm:w-14"
+												>
+													{#if meal.image}
+														<img
+															src={meal.image}
+															alt={meal.name}
+															class="h-full w-full object-cover"
+														/>
+													{:else}
+														<div class="flex h-full w-full items-center justify-center bg-muted/50">
+															<UtensilsIcon class="size-6 text-muted-foreground/40" />
+														</div>
 													{/if}
 												</div>
+												<!-- Color Indicator (Subtle Ring) -->
+												<div
+													class="absolute inset-0 rounded-2xl border-2 border-transparent opacity-60"
+													style="border-left-color: var(--chart-{(i % 5) + 1})"
+												></div>
+											</div>
+
+											<!-- Content -->
+											<div class="min-w-0 flex-1 space-y-1 pt-0.5">
+												<div class="flex items-start justify-between gap-4">
+													<div>
+														<h3 class="font-bold leading-tight text-foreground line-clamp-2">
+															{meal.name}
+														</h3>
+														<p class="text-xs font-medium text-muted-foreground/80">
+															{formatTime(meal.timestamp)}
+														</p>
+													</div>
+
+													<!-- Menu Trigger (Mobile & Desktop) -->
+													<div class="absolute right-2 top-2 sm:static sm:right-auto sm:top-auto">
+														<DropdownMenu.Root>
+															<DropdownMenu.Trigger
+																class="flex size-8 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+															>
+																<EllipsisIcon class="size-4" />
+															</DropdownMenu.Trigger>
+															<DropdownMenu.Content align="end">
+																<DropdownMenu.Item
+																	class="text-destructive focus:text-destructive"
+																	onclick={() => handleDeleteMeal(meal.id)}
+																>
+																	<Trash2Icon class="mr-2 size-4" />
+																	Delete
+																</DropdownMenu.Item>
+															</DropdownMenu.Content>
+														</DropdownMenu.Root>
+													</div>
+												</div>
+
+												<div class="flex items-center justify-between gap-4">
+													<!-- Macros -->
+													{#if meal.protein || meal.carbs || meal.fat}
+														<div
+															class="flex flex-wrap items-center gap-1.5 text-[11px] font-medium"
+														>
+															{#if meal.protein}
+																<span class="text-blue-500 dark:text-blue-400"
+																	>{meal.protein}g P</span
+																>
+															{/if}
+															{#if meal.carbs}
+																<span class="text-muted-foreground/40">•</span>
+																<span class="text-amber-500 dark:text-amber-400"
+																	>{meal.carbs}g C</span
+																>
+															{/if}
+															{#if meal.fat}
+																<span class="text-muted-foreground/40">•</span>
+																<span class="text-rose-500 dark:text-rose-400">{meal.fat}g F</span>
+															{/if}
+														</div>
+													{:else}
+														<div></div>
+													{/if}
+
+													<!-- Calories -->
+													<div class="flex items-baseline gap-1 text-right">
+														<span class="text-lg font-bold tabular-nums leading-none"
+															>{meal.calories}</span
+														>
+														<span
+															class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60"
+															>kcal</span
+														>
+													</div>
+												</div>
 											</div>
 										</div>
-
-										<!-- Delete Action -->
-										<button
-											class="hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full p-2 opacity-0 transition-opacity group-hover:opacity-100"
-											onclick={() => handleDeleteMeal(meal.id)}
-										>
-											<Trash2Icon class="size-4" />
-										</button>
 									</div>
 								{/each}
 							</div>
@@ -284,11 +352,13 @@
 		<div class="fixed bottom-8 left-1/2 z-30 -translate-x-1/2">
 			<Button
 				size="lg"
-				class="bg-primary text-primary-foreground shadow-primary/20 h-14 rounded-full px-6 shadow-lg transition-transform hover:scale-105"
+				class="group relative h-14 rounded-full border-t border-white/5 bg-primary px-8 shadow-lg transition-all hover:scale-105 active:scale-95"
 				onclick={() => (isAddModalOpen = true)}
 			>
-				<PlusIcon class="mr-2 size-5" />
-				<span class="font-bold">Log Meal</span>
+				<PlusIcon
+					class="mr-2 size-5 stroke-3 transition-transform duration-300 group-hover:rotate-90"
+				/>
+				<span class="font-bold tracking-wide">Log Meal</span>
 			</Button>
 		</div>
 	</div>

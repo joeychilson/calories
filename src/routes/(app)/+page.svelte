@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { addMeal, deleteMeal, getMeals } from '$lib/remote/meals.remote';
+	import { getLatestWeight, getSettings, logWeight } from '$lib/remote/weight.remote';
 	import { formatDate, getDisplayDate } from '$lib/utils/format';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -18,21 +19,14 @@
 	import { toast } from 'svelte-sonner';
 	import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
-	// TODO: Load from user settings
-	let settings = $state({
-		calorieGoal: 2200,
-		weightGoal: 165,
-		weightUnit: 'lbs',
-		currentWeight: 172.4
-	});
-
 	const selectedDate = new SvelteDate();
 	let isAddModalOpen = $state(false);
 	let isDatePickerOpen = $state(false);
 	let isWeightModalOpen = $state(false);
 
-	// Fetch meals from the server using remote function
 	const meals = getMeals();
+	const settings = getSettings();
+	const latestWeight = getLatestWeight();
 
 	let currentDayMeals = $derived.by(() => {
 		if (!meals.current) return [];
@@ -46,8 +40,13 @@
 		return currentDayMeals.reduce((acc, curr) => acc + curr.calories, 0);
 	});
 
-	let remainingCalories = $derived(settings.calorieGoal - totalCalories);
-	let isOver = $derived(totalCalories > settings.calorieGoal);
+	let calorieGoal = $derived(settings.current?.calorieGoal ?? 2200);
+	let weightGoal = $derived(settings.current?.weightGoal ?? null);
+	let weightUnit = $derived(settings.current?.weightUnit ?? 'lbs');
+	let currentWeight = $derived(latestWeight.current?.weight ?? null);
+
+	let remainingCalories = $derived(calorieGoal - totalCalories);
+	let isOver = $derived(totalCalories > calorieGoal);
 
 	let history = $derived.by(() => {
 		if (!meals.current) return [];
@@ -60,9 +59,9 @@
 		return Array.from(historyMap.entries()).map(([date, cals]) => ({
 			date,
 			status:
-				cals > settings.calorieGoal
+				cals > calorieGoal
 					? 'over'
-					: ((cals > settings.calorieGoal * 0.8 ? 'met' : 'under') as 'over' | 'met' | 'under')
+					: ((cals > calorieGoal * 0.8 ? 'met' : 'under') as 'over' | 'met' | 'under')
 		}));
 	});
 
@@ -109,9 +108,14 @@
 		}
 	}
 
-	function handleUpdateWeight(newWeight: number) {
-		settings.currentWeight = newWeight;
-		// TODO: Save to database
+	async function handleLogWeight(weight: number) {
+		try {
+			await logWeight({ weight }).updates(latestWeight);
+			toast.success('Weight logged!');
+		} catch (err) {
+			console.error('Failed to log weight:', err);
+			toast.error('Failed to log weight');
+		}
 	}
 </script>
 
@@ -183,7 +187,7 @@
 						</div>
 						<div class="text-right">
 							<span class="text-xl font-bold text-muted-foreground block leading-none"
-								>{settings.calorieGoal}</span
+								>{calorieGoal}</span
 							>
 						</div>
 					</div>
@@ -193,7 +197,7 @@
 							class="h-full rounded-full transition-all duration-1000 ease-out {isOver
 								? 'bg-destructive'
 								: 'bg-primary'}"
-							style="width: {Math.min((totalCalories / settings.calorieGoal) * 100, 100)}%"
+							style="width: {Math.min((totalCalories / calorieGoal) * 100, 100)}%"
 						></div>
 					</div>
 
@@ -215,21 +219,27 @@
 							>Weight</span
 						>
 					</div>
-					<div class="flex items-baseline gap-1">
-						<span class="text-2xl font-bold tracking-tight">{settings.currentWeight}</span>
-						<span class="text-xs font-medium text-muted-foreground">{settings.weightUnit}</span>
-					</div>
-					<div class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-						{#if settings.currentWeight > settings.weightGoal}
-							<TrendingDownIcon class="size-3 text-emerald-500" />
-							<span class="text-emerald-500 font-medium"
-								>{(settings.currentWeight - settings.weightGoal).toFixed(1)} to go</span
-							>
-						{:else}
-							<TrendingUpIcon class="size-3 text-emerald-500" />
-							<span class="text-emerald-500 font-medium">Goal Met!</span>
-						{/if}
-					</div>
+					{#if currentWeight}
+						<div class="flex items-baseline gap-1">
+							<span class="text-2xl font-bold tracking-tight">{currentWeight}</span>
+							<span class="text-xs font-medium text-muted-foreground">{weightUnit}</span>
+						</div>
+						<div class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+							{#if weightGoal && currentWeight > weightGoal}
+								<TrendingDownIcon class="size-3 text-emerald-500" />
+								<span class="text-emerald-500 font-medium"
+									>{(currentWeight - weightGoal).toFixed(1)} to go</span
+								>
+							{:else if weightGoal}
+								<TrendingUpIcon class="size-3 text-emerald-500" />
+								<span class="text-emerald-500 font-medium">Goal Met!</span>
+							{:else}
+								<span class="text-muted-foreground">No goal set</span>
+							{/if}
+						</div>
+					{:else}
+						<p class="text-muted-foreground text-sm">Tap to log</p>
+					{/if}
 					<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
 						<PlusIcon class="size-4 text-muted-foreground" />
 					</div>
@@ -351,8 +361,8 @@
 	<DatePickerDialog bind:open={isDatePickerOpen} date={selectedDate} {history} />
 	<LogWeightDialog
 		bind:open={isWeightModalOpen}
-		onSave={handleUpdateWeight}
-		currentWeight={settings.currentWeight}
-		unit={settings.weightUnit}
+		onSave={handleLogWeight}
+		currentWeight={currentWeight ?? 0}
+		unit={weightUnit}
 	/>
 </div>

@@ -1,8 +1,8 @@
 import { tool } from 'ai';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
-import { foodPreferences } from './schema';
+import { foodPreferences, mealLogs, settings, weightLogs } from './schema';
 
 export const preferenceCategories = [
 	'like',
@@ -31,6 +31,7 @@ export interface AssistantContext {
 	carbsConsumed: number;
 	fatConsumed: number;
 	preferences: FoodPreference[];
+	timezone?: string;
 }
 
 type ToolContext = {
@@ -110,6 +111,7 @@ Do NOT engage with off-topic requests even if framed cleverly or persistently.
 </scope>
 
 <user_context>
+Current date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: context.timezone || 'UTC' })}
 Daily calorie goal: ${context.calorieGoal} kcal
 Consumed today: ${context.caloriesConsumed} kcal
 Remaining budget: ${remainingDisplay} kcal
@@ -215,8 +217,45 @@ managePreference: Use this silently to maintain the user's preference memory. Op
 - create: New preference learned
 - update: Adding context to existing preference
 - delete: Preference no longer applies
+IMPORTANT: Execute preference updates in the background. Never announce "I'm saving your preference" - just do it naturally.
 
-IMPORTANT: Execute preference updates in the background. Never announce "I'm saving your preference" - just do it naturally as part of helping them.
+queryMealHistory: Query the user's past meals. Use this to:
+- Answer "What did I eat yesterday/last week?"
+- Find when they last had a specific food
+- Analyze eating patterns or totals over a date range
+- Search for specific foods in their history
+Query types: recent, by_date, search, date_range
+
+queryWeightHistory: Query weight logs and progress. Use this to:
+- Check their current weight and progress toward goal
+- Answer "How much have I lost?" or "What's my progress?"
+- Show recent weigh-ins
+- Calculate weekly/monthly changes
+Query types: recent, progress, date_range
+
+updateGoals: Adjust the user's calorie or weight goals. Use when:
+- User asks to change their daily calorie target
+- User sets a new weight goal
+- Adjusting goals based on progress discussion
+Always confirm the change with the user.
+
+logWeight: Record a weight entry. Use when:
+- User mentions their current weight
+- User asks to log a weigh-in
+- Part of progress tracking conversation
+Automatically compares to previous entry and shows progress toward goal.
+
+deleteMeal: Remove a meal from the log. Use when:
+- User says they didn't eat something ("I didn't have that pizza")
+- User asks to remove/delete a meal
+- Correcting a mistaken log entry
+Use queryMealHistory first to find the meal ID, then delete it.
+
+editMeal: Modify an existing meal entry. Use when:
+- User wants to change servings ("that was 2 servings")
+- User wants to correct calories or macros
+- User wants to rename a meal
+Use queryMealHistory first to find the meal ID, then edit it.
 </tool_usage>
 
 <examples>
@@ -237,6 +276,33 @@ User: "Actually I've started eating fish again"
 
 User: "What's a good high-protein breakfast?"
 → Consider their patterns, suggest 2-3 options fitting their calorie budget, use suggestFood for the best match
+
+User: "What did I eat yesterday?"
+→ Use queryMealHistory with by_date query to retrieve yesterday's meals, summarize them
+
+User: "When did I last have pizza?"
+→ Use queryMealHistory with search query for "pizza", show recent occurrences
+
+User: "How's my weight progress?"
+→ Use queryWeightHistory with progress query to show current weight, changes, and progress toward goal
+
+User: "I weighed 172 this morning"
+→ Use logWeight to record it, show comparison to previous and progress toward goal
+
+User: "Set my calorie goal to 1800"
+→ Use updateGoals to update calorieGoal, confirm the change
+
+User: "I want to reach 150 lbs"
+→ Use updateGoals to set weightGoal, confirm and provide encouragement
+
+User: "Delete that pizza I logged"
+→ Use queryMealHistory to find the pizza, then use deleteMeal with the meal ID
+
+User: "That chicken was actually 2 servings"
+→ Use queryMealHistory to find the chicken meal, then use editMeal to update servings to 2
+
+User: "Remove my last meal"
+→ Use queryMealHistory with recent query, then deleteMeal on the most recent entry
 </examples>
 
 <tone>
@@ -331,7 +397,561 @@ DELETE: Remove a preference when it no longer applies (e.g., "I actually like mu
 	}
 });
 
+const queryMealHistory = tool({
+	description: `Query the user's meal history. Use this to:
+- Look up what the user ate recently
+- Find meals on a specific date
+- Search for specific foods they've logged
+- Analyze eating patterns over time
+- Answer questions like "What did I have for lunch yesterday?" or "When did I last eat pizza?"`,
+	inputSchema: z.object({
+		query: z
+			.enum(['recent', 'by_date', 'search', 'date_range'])
+			.describe('Type of query to perform'),
+		date: z.string().optional().describe('Date in YYYY-MM-DD format (for by_date query)'),
+		startDate: z
+			.string()
+			.optional()
+			.describe('Start date in YYYY-MM-DD format (for date_range query)'),
+		endDate: z.string().optional().describe('End date in YYYY-MM-DD format (for date_range query)'),
+		searchTerm: z.string().optional().describe('Food name to search for (for search query)'),
+		limit: z.number().optional().default(10).describe('Maximum number of results to return')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { query, date, startDate, endDate, searchTerm, limit } = input;
+
+		let meals;
+
+		switch (query) {
+			case 'recent':
+				meals = await db
+					.select({
+						id: mealLogs.id,
+						name: mealLogs.name,
+						calories: mealLogs.calories,
+						protein: mealLogs.protein,
+						carbs: mealLogs.carbs,
+						fat: mealLogs.fat,
+						servings: mealLogs.servings,
+						mealDate: mealLogs.mealDate,
+						mealTime: mealLogs.mealTime
+					})
+					.from(mealLogs)
+					.where(eq(mealLogs.userId, ctx.userId))
+					.orderBy(desc(mealLogs.mealTime))
+					.limit(limit || 10);
+				break;
+
+			case 'by_date':
+				if (!date) {
+					return { success: false, error: 'Date is required for by_date query' };
+				}
+				meals = await db
+					.select({
+						id: mealLogs.id,
+						name: mealLogs.name,
+						calories: mealLogs.calories,
+						protein: mealLogs.protein,
+						carbs: mealLogs.carbs,
+						fat: mealLogs.fat,
+						servings: mealLogs.servings,
+						mealDate: mealLogs.mealDate,
+						mealTime: mealLogs.mealTime
+					})
+					.from(mealLogs)
+					.where(and(eq(mealLogs.userId, ctx.userId), eq(mealLogs.mealDate, date)))
+					.orderBy(desc(mealLogs.mealTime));
+				break;
+
+			case 'search':
+				if (!searchTerm) {
+					return { success: false, error: 'Search term is required for search query' };
+				}
+				meals = await db
+					.select({
+						id: mealLogs.id,
+						name: mealLogs.name,
+						calories: mealLogs.calories,
+						protein: mealLogs.protein,
+						carbs: mealLogs.carbs,
+						fat: mealLogs.fat,
+						servings: mealLogs.servings,
+						mealDate: mealLogs.mealDate,
+						mealTime: mealLogs.mealTime
+					})
+					.from(mealLogs)
+					.where(and(eq(mealLogs.userId, ctx.userId), like(mealLogs.name, `%${searchTerm}%`)))
+					.orderBy(desc(mealLogs.mealTime))
+					.limit(limit || 10);
+				break;
+
+			case 'date_range':
+				if (!startDate || !endDate) {
+					return { success: false, error: 'Start and end dates are required for date_range query' };
+				}
+				meals = await db
+					.select({
+						id: mealLogs.id,
+						name: mealLogs.name,
+						calories: mealLogs.calories,
+						protein: mealLogs.protein,
+						carbs: mealLogs.carbs,
+						fat: mealLogs.fat,
+						servings: mealLogs.servings,
+						mealDate: mealLogs.mealDate,
+						mealTime: mealLogs.mealTime
+					})
+					.from(mealLogs)
+					.where(
+						and(
+							eq(mealLogs.userId, ctx.userId),
+							gte(mealLogs.mealDate, startDate),
+							lte(mealLogs.mealDate, endDate)
+						)
+					)
+					.orderBy(desc(mealLogs.mealTime))
+					.limit(limit || 50);
+				break;
+
+			default:
+				return { success: false, error: 'Invalid query type' };
+		}
+
+		// Calculate totals for the results
+		const totals = meals.reduce(
+			(acc, meal) => ({
+				calories: acc.calories + (meal.calories || 0),
+				protein: acc.protein + (meal.protein || 0),
+				carbs: acc.carbs + (meal.carbs || 0),
+				fat: acc.fat + (meal.fat || 0)
+			}),
+			{ calories: 0, protein: 0, carbs: 0, fat: 0 }
+		);
+
+		return {
+			success: true,
+			count: meals.length,
+			meals: meals.map((m) => ({
+				...m,
+				mealTime: m.mealTime.toISOString()
+			})),
+			totals
+		};
+	}
+});
+
+const queryWeightHistory = tool({
+	description: `Query the user's weight history and progress. Use this to:
+- Check recent weight entries
+- Track progress toward weight goal
+- Analyze weight trends over time
+- Answer questions like "How much have I lost?" or "What was my weight last week?"`,
+	inputSchema: z.object({
+		query: z
+			.enum(['recent', 'progress', 'date_range'])
+			.describe('Type of query: recent entries, progress summary, or date range'),
+		limit: z
+			.number()
+			.optional()
+			.default(10)
+			.describe('Number of entries to return (for recent query)'),
+		startDate: z
+			.string()
+			.optional()
+			.describe('Start date in YYYY-MM-DD format (for date_range query)'),
+		endDate: z.string().optional().describe('End date in YYYY-MM-DD format (for date_range query)')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { query, limit, startDate, endDate } = input;
+
+		// Get user settings for weight goal and unit
+		const [userSettings] = await db.select().from(settings).where(eq(settings.userId, ctx.userId));
+
+		const weightUnit = userSettings?.weightUnit || 'lbs';
+		const weightGoal = userSettings?.weightGoal;
+
+		let weights;
+
+		switch (query) {
+			case 'recent':
+				weights = await db
+					.select({
+						id: weightLogs.id,
+						weight: weightLogs.weight,
+						date: weightLogs.date
+					})
+					.from(weightLogs)
+					.where(eq(weightLogs.userId, ctx.userId))
+					.orderBy(desc(weightLogs.date))
+					.limit(limit || 10);
+				break;
+
+			case 'progress': {
+				// Get all weight entries to calculate progress
+				weights = await db
+					.select({
+						id: weightLogs.id,
+						weight: weightLogs.weight,
+						date: weightLogs.date
+					})
+					.from(weightLogs)
+					.where(eq(weightLogs.userId, ctx.userId))
+					.orderBy(desc(weightLogs.date));
+
+				if (weights.length === 0) {
+					return {
+						success: true,
+						message: 'No weight entries recorded yet',
+						weightUnit,
+						weightGoal
+					};
+				}
+
+				const currentWeight = weights[0].weight;
+				const startingWeight = weights[weights.length - 1].weight;
+				const totalChange = currentWeight - startingWeight;
+
+				// Calculate 7-day and 30-day changes
+				const sevenDaysAgo = new Date();
+				sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+				const thirtyDaysAgo = new Date();
+				thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+				const weekAgoEntry = weights.find((w) => w.date <= sevenDaysAgo);
+				const monthAgoEntry = weights.find((w) => w.date <= thirtyDaysAgo);
+
+				return {
+					success: true,
+					currentWeight,
+					startingWeight,
+					totalChange: parseFloat(totalChange.toFixed(1)),
+					weightGoal,
+					remainingToGoal: weightGoal ? parseFloat((currentWeight - weightGoal).toFixed(1)) : null,
+					weeklyChange: weekAgoEntry
+						? parseFloat((currentWeight - weekAgoEntry.weight).toFixed(1))
+						: null,
+					monthlyChange: monthAgoEntry
+						? parseFloat((currentWeight - monthAgoEntry.weight).toFixed(1))
+						: null,
+					totalEntries: weights.length,
+					firstEntry: weights[weights.length - 1].date.toISOString(),
+					lastEntry: weights[0].date.toISOString(),
+					weightUnit
+				};
+			}
+
+			case 'date_range':
+				if (!startDate || !endDate) {
+					return { success: false, error: 'Start and end dates required for date_range query' };
+				}
+				weights = await db
+					.select({
+						id: weightLogs.id,
+						weight: weightLogs.weight,
+						date: weightLogs.date
+					})
+					.from(weightLogs)
+					.where(
+						and(
+							eq(weightLogs.userId, ctx.userId),
+							gte(weightLogs.date, new Date(startDate)),
+							lte(weightLogs.date, new Date(endDate))
+						)
+					)
+					.orderBy(desc(weightLogs.date));
+				break;
+
+			default:
+				return { success: false, error: 'Invalid query type' };
+		}
+
+		return {
+			success: true,
+			count: weights.length,
+			entries: weights.map((w) => ({
+				...w,
+				date: w.date.toISOString()
+			})),
+			weightUnit,
+			weightGoal
+		};
+	}
+});
+
+const updateGoals = tool({
+	description: `Update the user's calorie goal or weight goal. Use this when the user wants to:
+- Change their daily calorie target
+- Set or update their target weight
+- Adjust goals based on progress or new objectives
+
+Examples: "Set my calorie goal to 1800", "I want to reach 150 lbs", "Lower my daily target by 200 calories"`,
+	inputSchema: z.object({
+		calorieGoal: z
+			.number()
+			.int()
+			.min(1000)
+			.max(5000)
+			.optional()
+			.describe('New daily calorie goal (1000-5000)'),
+		weightGoal: z
+			.number()
+			.positive()
+			.optional()
+			.describe("New target weight (in user's preferred unit)")
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { calorieGoal, weightGoal } = input;
+
+		if (!calorieGoal && !weightGoal) {
+			return {
+				success: false,
+				error: 'At least one goal (calorieGoal or weightGoal) must be provided'
+			};
+		}
+
+		// Get current settings
+		const [currentSettings] = await db
+			.select()
+			.from(settings)
+			.where(eq(settings.userId, ctx.userId));
+
+		const updateData: { calorieGoal?: number; weightGoal?: number; updatedAt: Date } = {
+			updatedAt: new Date()
+		};
+
+		if (calorieGoal) {
+			updateData.calorieGoal = calorieGoal;
+		}
+
+		if (weightGoal) {
+			updateData.weightGoal = weightGoal;
+		}
+
+		if (currentSettings) {
+			await db.update(settings).set(updateData).where(eq(settings.userId, ctx.userId));
+		} else {
+			await db.insert(settings).values({
+				userId: ctx.userId,
+				calorieGoal: calorieGoal || 2200,
+				weightGoal: weightGoal,
+				onboardingCompleted: true
+			});
+		}
+
+		return {
+			success: true,
+			updated: {
+				calorieGoal: calorieGoal || currentSettings?.calorieGoal,
+				weightGoal: weightGoal || currentSettings?.weightGoal
+			}
+		};
+	}
+});
+
+const logWeight = tool({
+	description: `Log a weight entry for the user. Use this when:
+- User mentions their current weight ("I weigh 175 lbs today")
+- User wants to record a weigh-in
+- Updating progress tracking
+
+Always confirm the weight was logged successfully.`,
+	inputSchema: z.object({
+		weight: z.number().positive().describe('The weight value to log'),
+		date: z
+			.string()
+			.optional()
+			.describe('Date for the entry in YYYY-MM-DD format (defaults to today)')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { weight, date } = input;
+
+		// Get user's weight unit
+		const [userSettings] = await db.select().from(settings).where(eq(settings.userId, ctx.userId));
+
+		const weightUnit = userSettings?.weightUnit || 'lbs';
+		const entryDate = date ? new Date(date) : new Date();
+
+		// Check if there's already an entry for this date
+		const existingEntry = await db
+			.select()
+			.from(weightLogs)
+			.where(
+				and(eq(weightLogs.userId, ctx.userId), sql`DATE(${weightLogs.date}) = DATE(${entryDate})`)
+			);
+
+		if (existingEntry.length > 0) {
+			// Update existing entry
+			await db
+				.update(weightLogs)
+				.set({ weight, updatedAt: new Date() })
+				.where(eq(weightLogs.id, existingEntry[0].id));
+
+			return {
+				success: true,
+				updated: true,
+				weight,
+				weightUnit,
+				date: entryDate.toISOString()
+			};
+		}
+
+		// Create new entry
+		await db.insert(weightLogs).values({
+			userId: ctx.userId,
+			weight,
+			date: entryDate
+		});
+
+		// Get previous entry for comparison
+		const [previousEntry] = await db
+			.select()
+			.from(weightLogs)
+			.where(eq(weightLogs.userId, ctx.userId))
+			.orderBy(desc(weightLogs.date))
+			.limit(2);
+
+		const previousWeight = previousEntry?.weight;
+		const change = previousWeight ? parseFloat((weight - previousWeight).toFixed(1)) : null;
+
+		return {
+			success: true,
+			created: true,
+			weight,
+			weightUnit,
+			date: entryDate.toISOString(),
+			previousWeight,
+			change,
+			weightGoal: userSettings?.weightGoal
+		};
+	}
+});
+
+const deleteMeal = tool({
+	description: `Delete a meal from the user's log. Use this when:
+- User wants to remove a logged meal ("delete that pizza", "remove my lunch")
+- User says they didn't actually eat something
+- Correcting a mistaken entry
+
+Use queryMealHistory first to find the meal ID if needed.`,
+	inputSchema: z.object({
+		mealId: z.string().describe('The ID of the meal to delete')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { mealId } = input;
+
+		// Verify the meal belongs to this user
+		const [meal] = await db
+			.select()
+			.from(mealLogs)
+			.where(and(eq(mealLogs.id, mealId), eq(mealLogs.userId, ctx.userId)));
+
+		if (!meal) {
+			return { success: false, error: 'Meal not found' };
+		}
+
+		await db.delete(mealLogs).where(eq(mealLogs.id, mealId));
+
+		return {
+			success: true,
+			deleted: {
+				id: meal.id,
+				name: meal.name,
+				calories: meal.calories,
+				date: meal.mealDate
+			}
+		};
+	}
+});
+
+const editMeal = tool({
+	description: `Edit an existing meal entry. Use this when:
+- User wants to change the servings ("that was 2 servings not 1")
+- User wants to correct calories or macros
+- User wants to rename the meal
+- Any modification to an existing logged meal
+
+Use queryMealHistory first to find the meal ID if needed.`,
+	inputSchema: z.object({
+		mealId: z.string().describe('The ID of the meal to edit'),
+		name: z.string().optional().describe('New name for the meal'),
+		calories: z.number().optional().describe('Updated calories'),
+		protein: z.number().optional().describe('Updated protein in grams'),
+		carbs: z.number().optional().describe('Updated carbs in grams'),
+		fat: z.number().optional().describe('Updated fat in grams'),
+		servings: z.number().optional().describe('Updated number of servings')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { mealId, name, calories, protein, carbs, fat, servings } = input;
+
+		// Verify the meal belongs to this user
+		const [meal] = await db
+			.select()
+			.from(mealLogs)
+			.where(and(eq(mealLogs.id, mealId), eq(mealLogs.userId, ctx.userId)));
+
+		if (!meal) {
+			return { success: false, error: 'Meal not found' };
+		}
+
+		const updateData: {
+			name?: string;
+			calories?: number;
+			protein?: number;
+			carbs?: number;
+			fat?: number;
+			servings?: number;
+			updatedAt: Date;
+		} = { updatedAt: new Date() };
+
+		if (name !== undefined) updateData.name = name;
+		if (calories !== undefined) updateData.calories = calories;
+		if (protein !== undefined) updateData.protein = protein;
+		if (carbs !== undefined) updateData.carbs = carbs;
+		if (fat !== undefined) updateData.fat = fat;
+		if (servings !== undefined) updateData.servings = servings;
+
+		await db.update(mealLogs).set(updateData).where(eq(mealLogs.id, mealId));
+
+		// Get the updated meal
+		const [updatedMeal] = await db.select().from(mealLogs).where(eq(mealLogs.id, mealId));
+
+		return {
+			success: true,
+			previous: {
+				name: meal.name,
+				calories: meal.calories,
+				protein: meal.protein,
+				carbs: meal.carbs,
+				fat: meal.fat,
+				servings: meal.servings
+			},
+			updated: {
+				id: updatedMeal.id,
+				name: updatedMeal.name,
+				calories: updatedMeal.calories,
+				protein: updatedMeal.protein,
+				carbs: updatedMeal.carbs,
+				fat: updatedMeal.fat,
+				servings: updatedMeal.servings,
+				date: updatedMeal.mealDate
+			}
+		};
+	}
+});
+
 export const assistantTools = {
 	suggestFood,
-	managePreference
+	managePreference,
+	queryMealHistory,
+	queryWeightHistory,
+	updateGoals,
+	logWeight,
+	deleteMeal,
+	editMeal
 };

@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { Markdown } from '$lib/components/markdown';
-	import { ToolManagePreference, ToolSuggestFood } from '$lib/components/tool';
+	import {
+		ToolDeleteMeal,
+		ToolEditMeal,
+		ToolLogWeight,
+		ToolManagePreference,
+		ToolQueryMeals,
+		ToolSuggestFood,
+		ToolUpdateGoals,
+		ToolWeightProgress
+	} from '$lib/components/tool';
 	import {
 		InputGroup,
 		InputGroupAddon,
@@ -168,7 +177,13 @@
 			const response = await fetch('/api/assistant', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ messages, context })
+				body: JSON.stringify({
+					messages,
+					context: {
+						...context,
+						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+					}
+				})
 			});
 
 			if (!response.ok) {
@@ -237,7 +252,13 @@
 				(p) =>
 					(p.type === 'text' && p.text) ||
 					p.type === 'tool-suggestFood' ||
-					p.type === 'tool-managePreference'
+					p.type === 'tool-managePreference' ||
+					p.type === 'tool-queryMealHistory' ||
+					p.type === 'tool-queryWeightHistory' ||
+					p.type === 'tool-updateGoals' ||
+					p.type === 'tool-logWeight' ||
+					p.type === 'tool-deleteMeal' ||
+					p.type === 'tool-editMeal'
 			) ?? false
 		);
 	}
@@ -352,6 +373,21 @@
 														input={part.input}
 														output={part.state === 'output-available' ? part.output : undefined}
 													/>
+												{:else if part.type === 'tool-queryMealHistory' && part.state === 'output-available'}
+													<ToolQueryMeals output={part.output} />
+												{:else if part.type === 'tool-queryWeightHistory' && part.state === 'output-available'}
+													<ToolWeightProgress output={part.output} />
+												{:else if part.type === 'tool-updateGoals' && (part.state === 'input-available' || part.state === 'output-available')}
+													<ToolUpdateGoals
+														input={part.input}
+														output={part.state === 'output-available' ? part.output : undefined}
+													/>
+												{:else if part.type === 'tool-logWeight' && part.state === 'output-available'}
+													<ToolLogWeight output={part.output} />
+												{:else if part.type === 'tool-deleteMeal' && part.state === 'output-available'}
+													<ToolDeleteMeal output={part.output} />
+												{:else if part.type === 'tool-editMeal' && part.state === 'output-available'}
+													<ToolEditMeal output={part.output} />
 												{/if}
 											{/each}
 										{:else}

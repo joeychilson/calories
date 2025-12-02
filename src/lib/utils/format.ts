@@ -1,3 +1,8 @@
+export function parseLocalDate(dateStr: string): Date {
+	const [year, month, day] = dateStr.split('-').map(Number);
+	return new Date(year, month - 1, day);
+}
+
 export function formatTimeAgo(date: Date): string {
 	const diff = Date.now() - date.getTime();
 	const minutes = Math.floor(diff / 60000);

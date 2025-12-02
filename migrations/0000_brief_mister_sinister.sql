@@ -18,6 +18,7 @@ CREATE TABLE "meal_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"name" text NOT NULL,
+	"servings" real DEFAULT 1 NOT NULL,
 	"calories" integer NOT NULL,
 	"protein" integer,
 	"carbs" integer,

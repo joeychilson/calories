@@ -9,6 +9,7 @@
 		id: string;
 		name: string;
 		calories: number;
+		servings?: number;
 		protein?: number;
 		carbs?: number;
 		fat?: number;
@@ -25,6 +26,7 @@
 	} = $props();
 
 	let name = $state('');
+	let servings = $state('1');
 	let calories = $state('');
 	let protein = $state('');
 	let carbs = $state('');
@@ -33,6 +35,7 @@
 	$effect(() => {
 		if (open && meal) {
 			name = meal.name;
+			servings = meal.servings ? String(meal.servings) : '1';
 			calories = String(meal.calories);
 			protein = meal.protein ? String(meal.protein) : '';
 			carbs = meal.carbs ? String(meal.carbs) : '';
@@ -40,12 +43,37 @@
 		}
 	});
 
+	function handleServingsInput(e: Event & { currentTarget: HTMLInputElement }) {
+		const newVal = e.currentTarget.value;
+		const oldValNum = parseFloat(servings);
+		const newValNum = parseFloat(newVal);
+
+		// If we have valid numbers for both and they are different
+		if (
+			!isNaN(oldValNum) &&
+			!isNaN(newValNum) &&
+			oldValNum > 0 &&
+			newValNum > 0 &&
+			oldValNum !== newValNum
+		) {
+			const ratio = newValNum / oldValNum;
+
+			if (calories) calories = String(Math.round(parseInt(calories) * ratio));
+			if (protein) protein = String(Math.round(parseInt(protein) * ratio));
+			if (carbs) carbs = String(Math.round(parseInt(carbs) * ratio));
+			if (fat) fat = String(Math.round(parseInt(fat) * ratio));
+		}
+
+		servings = newVal;
+	}
+
 	function handleSubmit() {
 		if (!name || !calories || !meal) return;
 
 		onSave?.({
 			id: meal.id,
 			name,
+			servings: parseFloat(servings) || 1,
 			calories: parseInt(calories),
 			protein: protein ? parseInt(protein) : undefined,
 			carbs: carbs ? parseInt(carbs) : undefined,
@@ -77,20 +105,38 @@
 				</InputGroup.Root>
 			</div>
 
-			<div class="space-y-2">
-				<Label for="edit-calories">Calories</Label>
-				<InputGroup.Root>
-					<InputGroup.Input
-						id="edit-calories"
-						type="number"
-						inputmode="numeric"
-						placeholder="0"
-						bind:value={calories}
-					/>
-					<InputGroup.Addon>
-						<InputGroup.Text>kcal</InputGroup.Text>
-					</InputGroup.Addon>
-				</InputGroup.Root>
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-calories">Calories</Label>
+					<InputGroup.Root>
+						<InputGroup.Input
+							id="edit-calories"
+							type="number"
+							inputmode="numeric"
+							placeholder="0"
+							bind:value={calories}
+						/>
+						<InputGroup.Addon>
+							<InputGroup.Text>kcal</InputGroup.Text>
+						</InputGroup.Addon>
+					</InputGroup.Root>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-servings">Servings</Label>
+					<InputGroup.Root>
+						<InputGroup.Input
+							id="edit-servings"
+							type="number"
+							inputmode="numeric"
+							step="0.5"
+							min="0"
+							placeholder="1"
+							value={servings}
+							oninput={handleServingsInput}
+						/>
+					</InputGroup.Root>
+				</div>
 			</div>
 
 			<!-- Macros -->

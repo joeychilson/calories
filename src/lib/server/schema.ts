@@ -116,6 +116,7 @@ export const mealLogs = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
+		servings: real('servings').default(1).notNull(),
 		calories: integer('calories').notNull(),
 		protein: integer('protein'),
 		carbs: integer('carbs'),

@@ -1,5 +1,5 @@
 {
-	"id": "b43104cf-da36-4b3b-8c1a-c0203b69db54",
+	"id": "1ec7bec2-dae2-4685-b5e0-9fa35eb7e475",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"version": "7",
 	"dialect": "postgresql",
@@ -144,6 +144,13 @@
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true
+				},
+				"servings": {
+					"name": "servings",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 1
 				},
 				"calories": {
 					"name": "calories",

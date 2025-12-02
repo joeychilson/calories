@@ -67,6 +67,7 @@ export const analyzeMealImage = command(
 export const addMeal = command(
 	z.object({
 		name: z.string().min(1),
+		servings: z.number().positive().default(1),
 		calories: z.number().int().positive(),
 		protein: z.number().int().optional(),
 		carbs: z.number().int().optional(),
@@ -87,6 +88,7 @@ export const addMeal = command(
 			.values({
 				userId: locals.user.id,
 				name: input.name,
+				servings: input.servings,
 				calories: input.calories,
 				protein: input.protein,
 				carbs: input.carbs,
@@ -99,6 +101,7 @@ export const addMeal = command(
 		return {
 			id: meal.id,
 			name: meal.name,
+			servings: meal.servings,
 			calories: meal.calories,
 			protein: meal.protein,
 			carbs: meal.carbs,
@@ -138,6 +141,7 @@ export const updateMeal = command(
 	z.object({
 		id: z.uuid(),
 		name: z.string().min(1),
+		servings: z.number().positive().default(1),
 		calories: z.number().int().positive(),
 		protein: z.number().int().optional(),
 		carbs: z.number().int().optional(),
@@ -153,6 +157,7 @@ export const updateMeal = command(
 			.update(mealLogs)
 			.set({
 				name: input.name,
+				servings: input.servings,
 				calories: input.calories,
 				protein: input.protein,
 				carbs: input.carbs,
@@ -168,6 +173,7 @@ export const updateMeal = command(
 		return {
 			id: updatedMeal.id,
 			name: updatedMeal.name,
+			servings: updatedMeal.servings,
 			calories: updatedMeal.calories,
 			protein: updatedMeal.protein,
 			carbs: updatedMeal.carbs,
@@ -195,6 +201,7 @@ export const getMeals = query(async () => {
 	return meals.map((m) => ({
 		id: m.id,
 		name: m.name,
+		servings: m.servings,
 		calories: m.calories,
 		protein: m.protein,
 		carbs: m.carbs,

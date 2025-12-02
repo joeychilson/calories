@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import { Label } from '$lib/components/ui/label';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
+	import { Label } from '$lib/components/ui/label';
 	import { optimizeCalories, updateSettings } from '$lib/remote/weight.remote';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import ScaleIcon from '@lucide/svelte/icons/scale';

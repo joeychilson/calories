@@ -32,6 +32,7 @@
 		id: string;
 		name: string;
 		calories: number;
+		servings?: number;
 		protein?: number;
 		carbs?: number;
 		fat?: number;
@@ -82,6 +83,7 @@
 	type MealInput = {
 		name: string;
 		calories: number;
+		servings?: number;
 		protein?: number;
 		carbs?: number;
 		fat?: number;
@@ -94,6 +96,7 @@
 			await addMeal({
 				name: meal.name,
 				calories: meal.calories,
+				servings: meal.servings ?? 1,
 				protein: meal.protein,
 				carbs: meal.carbs,
 				fat: meal.fat,
@@ -112,12 +115,16 @@
 		id: string;
 		name: string;
 		calories: number;
+		servings?: number;
 		protein?: number;
 		carbs?: number;
 		fat?: number;
 	}) {
 		try {
-			await updateMeal(meal).updates(getMeals());
+			await updateMeal({
+				...meal,
+				servings: meal.servings ?? 1
+			}).updates(getMeals());
 			toast.success('Meal updated');
 		} catch (err) {
 			console.error('Failed to update meal:', err);
@@ -333,6 +340,7 @@
 																			id: meal.id,
 																			name: meal.name,
 																			calories: meal.calories,
+																			servings: meal.servings,
 																			protein: meal.protein ?? undefined,
 																			carbs: meal.carbs ?? undefined,
 																			fat: meal.fat ?? undefined

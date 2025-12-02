@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import CalorieRadialChart from '$lib/components/dashboard/calorie-radial-chart.svelte';
 	import AddMealDialog from '$lib/components/dialog/dialog-add-meal.svelte';
 	import DatePickerDialog from '$lib/components/dialog/dialog-date-picker.svelte';
@@ -9,7 +9,12 @@
 	import LogWeightDialog from '$lib/components/dialog/dialog-log-weight.svelte';
 	import SettingsDialog from '$lib/components/dialog/dialog-settings.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import {
+		DropdownMenu,
+		DropdownMenuContent,
+		DropdownMenuItem,
+		DropdownMenuTrigger
+	} from '$lib/components/ui/dropdown-menu';
 	import { addMeal, deleteMeal, getMeals, updateMeal } from '$lib/remote/meals.remote';
 	import { getLatestWeight, getSettings, logWeight } from '$lib/remote/weight.remote';
 	import { formatDate, formatTime, getDisplayDate } from '$lib/utils/format';
@@ -31,7 +36,7 @@
 		return isNaN(parsed.getTime()) ? new Date() : parsed;
 	}
 
-	const initialDateParam = $page.url.searchParams.get('d');
+	const initialDateParam = page.url.searchParams.get('d');
 	const selectedDate = new SvelteDate(parseDateParam(initialDateParam));
 
 	function updateUrlDate(date: Date) {
@@ -88,10 +93,9 @@
 
 	let history = $derived.by(() => {
 		const historyMap = new SvelteMap<string, number>();
-		meals.forEach((m) => {
-			const current = historyMap.get(m.date) || 0;
-			historyMap.set(m.date, current + m.calories);
-		});
+		for (const m of meals) {
+			historyMap.set(m.date, (historyMap.get(m.date) || 0) + m.calories);
+		}
 
 		return Array.from(historyMap.entries()).map(([date, cals]) => ({
 			date,
@@ -119,11 +123,9 @@
 		carbs?: number;
 		fat?: number;
 		imageKey?: string;
-		imageUrl?: string;
 	};
 
 	async function handleAddMeal(meal: MealInput) {
-		// Build ISO string with selected date + current time
 		const mealTime = new Date(
 			selectedDate.getFullYear(),
 			selectedDate.getMonth(),
@@ -145,8 +147,6 @@
 				mealDate: formatDate(selectedDate),
 				mealTime
 			}).updates(getMeals());
-
-			toast.success('Meal logged!');
 		} catch (err) {
 			console.error('Failed to add meal:', err);
 			toast.error('Failed to log meal');
@@ -167,7 +167,6 @@
 				...meal,
 				servings: meal.servings ?? 1
 			}).updates(getMeals());
-			toast.success('Meal updated');
 		} catch (err) {
 			console.error('Failed to update meal:', err);
 			toast.error('Failed to update meal');
@@ -177,7 +176,6 @@
 	async function handleDeleteMeal(id: string) {
 		try {
 			await deleteMeal(id).updates(getMeals());
-			toast.success('Meal deleted');
 		} catch (err) {
 			console.error('Failed to delete meal:', err);
 			toast.error('Failed to delete meal');
@@ -187,7 +185,6 @@
 	async function handleLogWeight(weight: number) {
 		try {
 			await logWeight({ weight }).updates(getLatestWeight());
-			toast.success('Weight logged!');
 		} catch (err) {
 			console.error('Failed to log weight:', err);
 			toast.error('Failed to log weight');
@@ -197,6 +194,11 @@
 
 <svelte:head>
 	<title>Calories</title>
+	<meta
+		name="description"
+		content="Calories is a simple app to help you track your calories and progress."
+	/>
+	<meta name="robots" content="noindex" />
 </svelte:head>
 
 <div class="flex h-full flex-col bg-background">
@@ -371,14 +373,14 @@
 														</div>
 													</div>
 													<div class="absolute right-2 top-2 sm:static sm:right-auto sm:top-auto">
-														<DropdownMenu.Root>
-															<DropdownMenu.Trigger
+														<DropdownMenu>
+															<DropdownMenuTrigger
 																class="flex size-8 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
 															>
 																<EllipsisIcon class="size-4" />
-															</DropdownMenu.Trigger>
-															<DropdownMenu.Content align="end">
-																<DropdownMenu.Item
+															</DropdownMenuTrigger>
+															<DropdownMenuContent align="end">
+																<DropdownMenuItem
 																	onclick={() => {
 																		editingMeal = {
 																			id: meal.id,
@@ -394,16 +396,16 @@
 																>
 																	<PencilIcon class="mr-2 size-4" />
 																	Edit
-																</DropdownMenu.Item>
-																<DropdownMenu.Item
+																</DropdownMenuItem>
+																<DropdownMenuItem
 																	class="text-destructive focus:text-destructive"
 																	onclick={() => handleDeleteMeal(meal.id)}
 																>
 																	<Trash2Icon class="mr-2 size-4" />
 																	Delete
-																</DropdownMenu.Item>
-															</DropdownMenu.Content>
-														</DropdownMenu.Root>
+																</DropdownMenuItem>
+															</DropdownMenuContent>
+														</DropdownMenu>
 													</div>
 												</div>
 												<div class="flex items-center justify-between gap-4">
@@ -427,8 +429,6 @@
 																<span class="text-rose-500 dark:text-rose-400">{meal.fat}g F</span>
 															{/if}
 														</div>
-													{:else}
-														<div></div>
 													{/if}
 													<div class="flex items-baseline gap-1 text-right">
 														<span class="text-lg font-bold tabular-nums leading-none"

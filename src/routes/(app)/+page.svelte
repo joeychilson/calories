@@ -242,7 +242,7 @@
 							thickness={16}
 						/>
 
-						{#if totalProtein > 0 || totalCarbs > 0 || totalFat > 0}
+						{#if currentDayMeals.length > 0}
 							<div class="mt-2 flex items-center gap-8" transition:slide>
 								<div class="flex flex-col items-center">
 									<span class="text-lg font-bold text-blue-500 dark:text-blue-400"
@@ -420,27 +420,17 @@
 													</div>
 												</div>
 												<div class="flex items-center justify-between gap-4">
-													{#if meal.protein || meal.carbs || meal.fat}
-														<div
-															class="flex flex-wrap items-center gap-1.5 text-[11px] font-medium"
+													<div class="flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
+														<span class="text-blue-500 dark:text-blue-400"
+															>{meal.protein ?? 0}g P</span
 														>
-															{#if meal.protein}
-																<span class="text-blue-500 dark:text-blue-400"
-																	>{meal.protein}g P</span
-																>
-															{/if}
-															{#if meal.carbs}
-																<span class="text-muted-foreground/40">•</span>
-																<span class="text-amber-500 dark:text-amber-400"
-																	>{meal.carbs}g C</span
-																>
-															{/if}
-															{#if meal.fat}
-																<span class="text-muted-foreground/40">•</span>
-																<span class="text-rose-500 dark:text-rose-400">{meal.fat}g F</span>
-															{/if}
-														</div>
-													{/if}
+														<span class="text-muted-foreground/40">•</span>
+														<span class="text-amber-500 dark:text-amber-400"
+															>{meal.carbs ?? 0}g C</span
+														>
+														<span class="text-muted-foreground/40">•</span>
+														<span class="text-rose-500 dark:text-rose-400">{meal.fat ?? 0}g F</span>
+													</div>
 													<div class="flex items-baseline gap-1 text-right">
 														<span class="text-lg font-bold tabular-nums leading-none"
 															>{meal.calories}</span

@@ -17,16 +17,14 @@ import { z } from 'zod';
 const MIME_TO_EXT: Record<string, string> = {
 	'image/jpeg': 'jpg',
 	'image/png': 'png',
-	'image/webp': 'webp',
-	'image/heic': 'heic'
+	'image/webp': 'webp'
 };
 
 const EXT_TO_MIME: Record<string, string> = {
 	jpg: 'image/jpeg',
 	jpeg: 'image/jpeg',
 	png: 'image/png',
-	webp: 'image/webp',
-	heic: 'image/heic'
+	webp: 'image/webp'
 };
 
 export const getImageUploadUrl = command(z.object({ mimeType: z.string() }), async (input) => {
@@ -39,7 +37,7 @@ export const getImageUploadUrl = command(z.object({ mimeType: z.string() }), asy
 	const timestamp = Date.now();
 	const imageKey = `temp/${locals.user.id}/${timestamp}.${ext}`;
 	const uploadUrl = getPresignedUploadUrl(imageKey);
-	const downloadUrl = getPresignedUrl(imageKey, 86400); // 24 hour expiry
+	const downloadUrl = getPresignedUrl(imageKey, 86400);
 
 	return { imageKey, uploadUrl, downloadUrl };
 });

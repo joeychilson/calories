@@ -65,7 +65,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			stream: createUIMessageStream<Message>({
 				execute: async ({ writer }) => {
 					const result = streamText({
-						model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
+						model: openrouter.chat('anthropic/claude-haiku-4.5'),
 						system: systemPrompt,
 						messages: convertToModelMessages(messages),
 						tools: assistantTools,

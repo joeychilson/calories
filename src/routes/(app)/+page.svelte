@@ -340,7 +340,7 @@
 								onclick={() => (isAssistantOpen = true)}
 							>
 								<SparklesIcon class="size-5" />
-								Ask AI
+								Ask Assistant
 							</Button>
 						</div>
 					</div>

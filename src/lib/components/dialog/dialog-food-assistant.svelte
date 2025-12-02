@@ -8,6 +8,7 @@
 		InputGroupTextarea
 	} from '$lib/components/ui/input-group';
 	import type { Message, MessagePart } from '$lib/messages';
+	import { deleteUploadedImage, getImageUploadUrl } from '$lib/remote/meals.remote';
 	import type { AssistantContext } from '$lib/server/assistant';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import ChefHatIcon from '@lucide/svelte/icons/chef-hat';
@@ -49,7 +50,9 @@
 	} = $props();
 
 	let imagePreview = $state<string | null>(null);
-	let imageData = $state<{ base64: string; mimeType: string } | null>(null);
+	let imageData = $state<{ imageKey: string; downloadUrl: string; mimeType: string } | null>(null);
+	let currentImageKey = $state<string | null>(null);
+	let uploadedImageKeys = $state<string[]>([]);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let messagesContainer = $state<HTMLDivElement | null>(null);
 	let input = $state('');
@@ -59,8 +62,16 @@
 	const remainingCalories = $derived(Math.max(0, context.calorieGoal - context.caloriesConsumed));
 
 	function reset() {
+		for (const key of uploadedImageKeys) {
+			deleteUploadedImage({ imageKey: key }).catch(() => {});
+		}
+		if (currentImageKey && !uploadedImageKeys.includes(currentImageKey)) {
+			deleteUploadedImage({ imageKey: currentImageKey }).catch(() => {});
+		}
 		imagePreview = null;
 		imageData = null;
+		currentImageKey = null;
+		uploadedImageKeys = [];
 		input = '';
 		messages = [];
 		isStreaming = false;
@@ -83,15 +94,6 @@
 		}
 	});
 
-	function fileToBase64(file: File): Promise<string> {
-		return new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(reader.result as string);
-			reader.onerror = reject;
-			reader.readAsDataURL(file);
-		});
-	}
-
 	async function handleFileSelect(e: Event) {
 		const target = e.target as HTMLInputElement;
 		if (!target.files || !target.files[0]) return;
@@ -99,14 +101,33 @@
 		const file = target.files[0];
 		imagePreview = URL.createObjectURL(file);
 
-		const base64 = await fileToBase64(file);
-		const mimeType = file.type || 'image/jpeg';
-		imageData = { base64, mimeType };
+		try {
+			const mimeType = file.type || 'image/jpeg';
+			const { imageKey, uploadUrl, downloadUrl } = await getImageUploadUrl({ mimeType });
+			const res = await fetch(uploadUrl, {
+				method: 'PUT',
+				body: file,
+				headers: { 'Content-Type': mimeType }
+			});
+
+			if (!res.ok) throw new Error('Upload failed');
+
+			currentImageKey = imageKey;
+			imageData = { imageKey, downloadUrl, mimeType };
+		} catch (err) {
+			console.error('Image upload failed:', err);
+			toast.error('Failed to upload image');
+			imagePreview = null;
+		}
 	}
 
 	function clearImage() {
+		if (currentImageKey) {
+			deleteUploadedImage({ imageKey: currentImageKey }).catch(() => {});
+		}
 		imagePreview = null;
 		imageData = null;
+		currentImageKey = null;
 		if (fileInput) fileInput.value = '';
 	}
 
@@ -122,7 +143,7 @@
 		if (currentImageData) {
 			userParts.push({
 				type: 'file',
-				url: currentImageData.base64,
+				url: currentImageData.downloadUrl,
 				mediaType: currentImageData.mimeType
 			});
 		}
@@ -141,8 +162,12 @@
 		isStreaming = true;
 
 		if (imageData) {
+			if (currentImageKey) {
+				uploadedImageKeys = [...uploadedImageKeys, currentImageKey];
+			}
 			imageData = null;
 			imagePreview = null;
+			currentImageKey = null;
 		}
 
 		try {
@@ -287,17 +312,13 @@
 					<div class={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
 						{#if message.role === 'user'}
 							<div class="max-w-[85%] space-y-2">
-								{#if message.parts?.some((p) => p.type === 'file')}
+								{#each message.parts?.filter((p) => p.type === 'file') || [] as filePart, i (i)}
 									<div class="flex justify-end">
 										<div class="w-32 h-32 rounded-xl overflow-hidden border">
-											<img
-												src={message.parts.find((p) => p.type === 'file')?.url}
-												alt="Uploaded"
-												class="w-full h-full object-cover"
-											/>
+											<img src={filePart.url} alt="Uploaded" class="w-full h-full object-cover" />
 										</div>
 									</div>
-								{/if}
+								{/each}
 								{#if getMessageText(message)}
 									<div
 										class="rounded-2xl rounded-br-md bg-primary px-4 py-2 text-primary-foreground shadow-xs"

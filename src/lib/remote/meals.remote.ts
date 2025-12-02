@@ -2,16 +2,52 @@ import { command, getRequestEvent, query } from '$app/server';
 import { analyzeMealFromImage, analyzeMealFromText } from '$lib/server/ai';
 import { db } from '$lib/server/db';
 import { mealLogs } from '$lib/server/schema';
-import { getPresignedUrl, s3Client } from '$lib/server/storage';
+import {
+	deleteImage,
+	getImageBuffer,
+	getPresignedUploadUrl,
+	getPresignedUrl,
+	imageExists,
+	s3Client
+} from '$lib/server/storage';
 import { error } from '@sveltejs/kit';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
+const MIME_TO_EXT: Record<string, string> = {
+	'image/jpeg': 'jpg',
+	'image/png': 'png',
+	'image/webp': 'webp',
+	'image/heic': 'heic'
+};
+
+const EXT_TO_MIME: Record<string, string> = {
+	jpg: 'image/jpeg',
+	jpeg: 'image/jpeg',
+	png: 'image/png',
+	webp: 'image/webp',
+	heic: 'image/heic'
+};
+
+export const getImageUploadUrl = command(z.object({ mimeType: z.string() }), async (input) => {
+	const { locals } = getRequestEvent();
+	if (!locals.session || !locals.user) {
+		return error(401, 'Unauthorized');
+	}
+
+	const ext = MIME_TO_EXT[input.mimeType] || 'jpg';
+	const timestamp = Date.now();
+	const imageKey = `temp/${locals.user.id}/${timestamp}.${ext}`;
+	const uploadUrl = getPresignedUploadUrl(imageKey);
+	const downloadUrl = getPresignedUrl(imageKey, 86400); // 24 hour expiry
+
+	return { imageKey, uploadUrl, downloadUrl };
+});
+
 export const analyzeMealImage = command(
 	z.object({
-		imageData: z.string(),
-		mimeType: z.string(),
-		fileName: z.string()
+		imageKey: z.string(),
+		mimeType: z.string().default('image/jpeg')
 	}),
 	async (input) => {
 		const { locals } = getRequestEvent();
@@ -19,16 +55,22 @@ export const analyzeMealImage = command(
 			return error(401, 'Unauthorized');
 		}
 
-		const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-		if (!allowedTypes.includes(input.mimeType)) {
-			return error(400, 'Invalid image type. Please upload a JPEG, PNG, or WebP image.');
+		if (!input.imageKey.startsWith(`temp/${locals.user.id}/`)) {
+			return error(403, 'Invalid image key');
 		}
 
 		try {
-			const base64Data = input.imageData.replace(/^data:image\/\w+;base64,/, '');
+			const exists = await imageExists(input.imageKey);
+			if (!exists) {
+				return error(404, 'Image not found. Please try uploading again.');
+			}
+
+			const imageBuffer = await getImageBuffer(input.imageKey);
+			const base64Data = imageBuffer.toString('base64');
 
 			const analysis = await analyzeMealFromImage(base64Data, input.mimeType);
 			if (!analysis.isFood) {
+				await deleteImage(input.imageKey);
 				return error(
 					400,
 					analysis.rejectionReason ||
@@ -36,22 +78,13 @@ export const analyzeMealImage = command(
 				);
 			}
 
-			const timestamp = Date.now();
-			const ext = input.fileName.split('.').pop() || 'jpg';
-			const imageKey = `meals/${locals.user.id}/${timestamp}.${ext}`;
-
-			const buffer = Buffer.from(base64Data, 'base64');
-			await s3Client.write(imageKey, buffer, {
-				type: input.mimeType
-			});
-
 			return {
 				name: analysis.name,
 				calories: analysis.calories,
 				protein: analysis.protein,
 				carbs: analysis.carbs,
 				fat: analysis.fat,
-				imageKey,
+				imageKey: input.imageKey,
 				isNutritionLabel: analysis.isNutritionLabel,
 				servingSize: analysis.servingSize,
 				servingQuantity: analysis.servingQuantity,
@@ -60,6 +93,29 @@ export const analyzeMealImage = command(
 		} catch (err) {
 			console.error('Meal analysis failed:', err);
 			return error(500, 'Failed to analyze meal. Please try again.');
+		}
+	}
+);
+
+export const deleteUploadedImage = command(
+	z.object({
+		imageKey: z.string()
+	}),
+	async (input) => {
+		const { locals } = getRequestEvent();
+		if (!locals.session || !locals.user) {
+			return error(401, 'Unauthorized');
+		}
+
+		if (!input.imageKey.startsWith(`temp/${locals.user.id}/`)) {
+			return error(403, 'Invalid image key');
+		}
+
+		try {
+			await deleteImage(input.imageKey);
+			return { success: true };
+		} catch {
+			return { success: true };
 		}
 	}
 );
@@ -118,6 +174,19 @@ export const addMeal = command(
 
 		const mealTime = input.mealTime ? new Date(input.mealTime) : new Date();
 
+		let permanentImageKey: string | undefined;
+
+		if (input.imageKey?.startsWith(`temp/${locals.user.id}/`)) {
+			const ext = input.imageKey.split('.').pop() || 'jpg';
+			const mimeType = EXT_TO_MIME[ext] || 'image/jpeg';
+			const timestamp = Date.now();
+			permanentImageKey = `meals/${locals.user.id}/${timestamp}.${ext}`;
+
+			const imageBuffer = await getImageBuffer(input.imageKey);
+			await s3Client.write(permanentImageKey, imageBuffer, { type: mimeType });
+			await deleteImage(input.imageKey);
+		}
+
 		const [meal] = await db
 			.insert(mealLogs)
 			.values({
@@ -128,7 +197,7 @@ export const addMeal = command(
 				protein: input.protein,
 				carbs: input.carbs,
 				fat: input.fat,
-				image: input.imageKey,
+				image: permanentImageKey,
 				mealDate: input.mealDate,
 				mealTime
 			})

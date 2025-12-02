@@ -8,7 +8,12 @@
 	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { analyzeMealImage, analyzeMealText } from '$lib/remote/meals.remote';
+	import {
+		analyzeMealImage,
+		analyzeMealText,
+		deleteUploadedImage,
+		getImageUploadUrl
+	} from '$lib/remote/meals.remote';
 	import AlignLeftIcon from '@lucide/svelte/icons/align-left';
 	import CameraIcon from '@lucide/svelte/icons/camera';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -76,7 +81,10 @@
 	let carbs = $derived(Math.round(baseCarbs * servings));
 	let fat = $derived(Math.round(baseFat * servings));
 
-	function reset() {
+	function reset(deleteImage = false) {
+		if (deleteImage && imageKey) {
+			deleteUploadedImage({ imageKey }).catch(() => {});
+		}
 		name = '';
 		description = '';
 		amountEaten = '1';
@@ -95,37 +103,42 @@
 		mode = 'camera';
 	}
 
-	function fileToBase64(file: File): Promise<string> {
-		return new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => {
-				const result = reader.result as string;
-				resolve(result);
-			};
-			reader.onerror = reject;
-			reader.readAsDataURL(file);
-		});
-	}
+	let wasOpen = $state(false);
+
+	$effect(() => {
+		if (wasOpen && !open) {
+			reset(true);
+		}
+		wasOpen = open;
+	});
 
 	async function handleFileSelect(e: Event) {
 		const target = e.target as HTMLInputElement;
 		if (!target.files || !target.files[0]) return;
 
 		const file = target.files[0];
+		const mimeType = file.type || 'image/jpeg';
 
 		imagePreview = URL.createObjectURL(file);
 		analyzing = true;
 		analyzed = false;
 
 		try {
-			const base64 = await fileToBase64(file);
-			const mimeType = file.type || 'image/jpeg';
+			const { imageKey: key, uploadUrl } = await getImageUploadUrl({ mimeType });
 
-			const result = await analyzeMealImage({
-				imageData: base64,
-				mimeType,
-				fileName: file.name
+			const uploadResponse = await fetch(uploadUrl, {
+				method: 'PUT',
+				body: file,
+				headers: { 'Content-Type': mimeType }
 			});
+
+			if (!uploadResponse.ok) {
+				throw new Error('Failed to upload image');
+			}
+
+			imageKey = key;
+
+			const result = await analyzeMealImage({ imageKey: key, mimeType });
 
 			name = result.name;
 			baseCalories = result.calories;
@@ -134,12 +147,10 @@
 			baseFat = result.fat;
 			imageKey = result.imageKey;
 			analyzed = true;
-
 			isNutritionLabel = result.isNutritionLabel ?? false;
 			servingSize = result.servingSize ?? null;
 			servingQuantity = result.servingQuantity ?? null;
 			servingUnit = result.servingUnit ?? null;
-
 			if (isNutritionLabel && servingQuantity) {
 				amountEaten = String(servingQuantity);
 			} else {
@@ -184,7 +195,10 @@
 		}
 	}
 
-	function clearImage() {
+	async function clearImage() {
+		if (imageKey) {
+			deleteUploadedImage({ imageKey }).catch(() => {});
+		}
 		imagePreview = null;
 		imageKey = null;
 		analyzed = false;
@@ -209,7 +223,7 @@
 		});
 
 		open = false;
-		reset();
+		reset(false);
 	}
 
 	function setQuickAmount(multiplier: number) {

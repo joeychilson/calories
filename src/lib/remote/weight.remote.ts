@@ -1,6 +1,7 @@
 import { command, getRequestEvent, query } from '$app/server';
 import { db } from '$lib/server/db';
 import { weightLogs } from '$lib/server/schema';
+import { formatDate } from '$lib/utils/format';
 import { error } from '@sveltejs/kit';
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -30,7 +31,7 @@ export const logWeight = command(
 		return {
 			id: log.id,
 			weight: log.weight,
-			date: log.date.toISOString().split('T')[0],
+			date: formatDate(log.date),
 			timestamp: log.date.getTime()
 		};
 	}
@@ -52,7 +53,7 @@ export const getWeightLogs = query(async () => {
 	return logs.map((l) => ({
 		id: l.id,
 		weight: l.weight,
-		date: l.date.toISOString().split('T')[0],
+		date: formatDate(l.date),
 		timestamp: l.date.getTime()
 	}));
 });
@@ -74,6 +75,6 @@ export const getLatestWeight = query(async () => {
 
 	return {
 		weight: latest.weight,
-		date: latest.date.toISOString().split('T')[0]
+		date: formatDate(latest.date)
 	};
 });

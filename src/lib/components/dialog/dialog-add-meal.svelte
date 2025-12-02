@@ -24,24 +24,16 @@
 	import TagIcon from '@lucide/svelte/icons/tag';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { toast } from 'svelte-sonner';
+	import NutritionSummary from '$lib/components/nutrition-summary.svelte';
+	import type { MealInput } from '$lib/types';
 	import ResponsiveDialog from './dialog-responsive.svelte';
-
-	type MealData = {
-		name: string;
-		calories: number;
-		servings?: number;
-		protein?: number;
-		carbs?: number;
-		fat?: number;
-		imageKey?: string;
-	};
 
 	let {
 		open = $bindable(false),
 		onAdd
 	}: {
 		open?: boolean;
-		onAdd?: (meal: MealData) => void;
+		onAdd?: (meal: MealInput) => void;
 	} = $props();
 
 	let mode = $state<'camera' | 'describe' | 'manual'>('camera');
@@ -461,25 +453,16 @@
 							2×
 						</button>
 					</div>
-					<div class="rounded-xl bg-muted/30 p-4">
-						<div class="flex items-center justify-between mb-3">
-							<span class="text-sm font-medium text-muted-foreground">Your total</span>
-							<span class="text-xs text-muted-foreground">
-								{servings.toFixed(1)} serving{servings !== 1 ? 's' : ''}
-							</span>
-						</div>
-						<div class="flex items-baseline gap-1">
-							<span class="text-3xl font-bold tabular-nums">{calories}</span>
-							<span class="text-sm font-medium text-muted-foreground">kcal</span>
-						</div>
-						<div class="mt-3 flex items-center gap-4 text-sm">
-							<span class="text-blue-500 dark:text-blue-400 font-medium">{protein}g P</span>
-							<span class="text-muted-foreground/40">•</span>
-							<span class="text-amber-500 dark:text-amber-400 font-medium">{carbs}g C</span>
-							<span class="text-muted-foreground/40">•</span>
-							<span class="text-rose-500 dark:text-rose-400 font-medium">{fat}g F</span>
-						</div>
-					</div>
+					<NutritionSummary
+						{calories}
+						{protein}
+						{carbs}
+						{fat}
+						label="Your total"
+						servingsLabel="{servings.toFixed(1)} serving{servings !== 1 ? 's' : ''}"
+						size="lg"
+						alwaysShowMacros
+					/>
 				</div>
 			{:else}
 				<div class="grid grid-cols-2 gap-4">
@@ -571,30 +554,13 @@
 				</div>
 
 				{#if parseFloat(amountEaten) > 1 && baseCalories > 0}
-					<div class="rounded-xl bg-muted/30 p-4">
-						<div class="flex items-center justify-between mb-2">
-							<span class="text-sm font-medium text-muted-foreground"
-								>Total for {amountEaten} servings</span
-							>
-						</div>
-						<div class="flex items-baseline gap-1">
-							<span class="text-2xl font-bold tabular-nums">{calories}</span>
-							<span class="text-sm font-medium text-muted-foreground">kcal</span>
-						</div>
-						{#if protein > 0 || carbs > 0 || fat > 0}
-							<div class="mt-2 flex items-center gap-3 text-sm">
-								{#if protein > 0}
-									<span class="text-blue-500 dark:text-blue-400 font-medium">{protein}g P</span>
-								{/if}
-								{#if carbs > 0}
-									<span class="text-amber-500 dark:text-amber-400 font-medium">{carbs}g C</span>
-								{/if}
-								{#if fat > 0}
-									<span class="text-rose-500 dark:text-rose-400 font-medium">{fat}g F</span>
-								{/if}
-							</div>
-						{/if}
-					</div>
+					<NutritionSummary
+						{calories}
+						{protein}
+						{carbs}
+						{fat}
+						label="Total for {amountEaten} servings"
+					/>
 				{/if}
 			{/if}
 		</div>

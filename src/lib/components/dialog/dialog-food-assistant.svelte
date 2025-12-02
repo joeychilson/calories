@@ -21,6 +21,7 @@
 	import { DefaultChatTransport, readUIMessageStream } from 'ai';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import type { MealInput } from '$lib/types';
 	import DialogFoodAssistantCard from './dialog-food-assistant-card.svelte';
 	import ResponsiveDialog from './dialog-responsive.svelte';
 
@@ -30,15 +31,6 @@
 		}
 	}
 
-	type MealData = {
-		name: string;
-		calories: number;
-		servings?: number;
-		protein?: number;
-		carbs?: number;
-		fat?: number;
-	};
-
 	let {
 		open = $bindable(false),
 		context,
@@ -46,7 +38,7 @@
 	}: {
 		open?: boolean;
 		context: AssistantContext;
-		onLogMeal?: (meal: MealData) => void;
+		onLogMeal?: (meal: MealInput) => void;
 	} = $props();
 
 	let imagePreview = $state<string | null>(null);
@@ -347,7 +339,7 @@
 														protein={part.input.protein}
 														carbs={part.input.carbs}
 														fat={part.input.fat}
-														onLog={() => onLogMeal?.(part.input as MealData)}
+														onLog={() => onLogMeal?.(part.input as MealInput)}
 													/>
 												{/if}
 											{/each}

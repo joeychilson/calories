@@ -2,7 +2,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import CalorieRadialChart from '$lib/components/dashboard/calorie-radial-chart.svelte';
+	import CalorieRadialChart from '$lib/components/calorie-radial-chart.svelte';
 	import {
 		AddMealDialog,
 		DatePickerDialog,
@@ -373,13 +373,10 @@
 										class="group relative overflow-hidden rounded-2xl bg-muted/30 transition-colors hover:bg-muted/50"
 									>
 										<div class="flex items-stretch">
-											<!-- Chart color indicator -->
 											<div
 												class="w-1 shrink-0 rounded-l-2xl"
 												style="background-color: var(--chart-{(i % 5) + 1})"
 											></div>
-
-											<!-- Image Section -->
 											<div class="relative w-20 shrink-0">
 												{#if meal.image}
 													<img

@@ -7,18 +7,10 @@
 		InputGroupText
 	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
+	import NutritionSummary from '$lib/components/nutrition-summary.svelte';
+	import type { MealWithId } from '$lib/types';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ResponsiveDialog from './dialog-responsive.svelte';
-
-	type MealData = {
-		id: string;
-		name: string;
-		calories: number;
-		servings?: number;
-		protein?: number;
-		carbs?: number;
-		fat?: number;
-	};
 
 	let {
 		open = $bindable(false),
@@ -26,8 +18,8 @@
 		onSave
 	}: {
 		open?: boolean;
-		meal: MealData | null;
-		onSave?: (meal: MealData) => void;
+		meal: MealWithId | null;
+		onSave?: (meal: MealWithId) => void;
 	} = $props();
 
 	let name = $state('');
@@ -204,30 +196,13 @@
 			</div>
 
 			{#if servingsNum !== 1 && baseCalories > 0}
-				<div class="rounded-xl bg-muted/30 p-4">
-					<div class="flex items-center justify-between mb-2">
-						<span class="text-sm font-medium text-muted-foreground"
-							>Total for {servings} serving{servingsNum !== 1 ? 's' : ''}</span
-						>
-					</div>
-					<div class="flex items-baseline gap-1">
-						<span class="text-2xl font-bold tabular-nums">{calories}</span>
-						<span class="text-sm font-medium text-muted-foreground">kcal</span>
-					</div>
-					{#if protein > 0 || carbs > 0 || fat > 0}
-						<div class="mt-2 flex items-center gap-3 text-sm">
-							{#if protein > 0}
-								<span class="text-blue-500 dark:text-blue-400 font-medium">{protein}g P</span>
-							{/if}
-							{#if carbs > 0}
-								<span class="text-amber-500 dark:text-amber-400 font-medium">{carbs}g C</span>
-							{/if}
-							{#if fat > 0}
-								<span class="text-rose-500 dark:text-rose-400 font-medium">{fat}g F</span>
-							{/if}
-						</div>
-					{/if}
-				</div>
+				<NutritionSummary
+					{calories}
+					{protein}
+					{carbs}
+					{fat}
+					label="Total for {servings} serving{servingsNum !== 1 ? 's' : ''}"
+				/>
 			{/if}
 		</div>
 

@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import * as InputGroup from '$lib/components/ui/input-group/index.js';
+	import {
+		InputGroup,
+		InputGroupAddon,
+		InputGroupInput,
+		InputGroupText
+	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { analyzeMealImage, analyzeMealText } from '$lib/remote/meals.remote';
@@ -45,7 +50,7 @@
 	let imageKey = $state<string | null>(null);
 	let analyzing = $state(false);
 	let analyzed = $state(false);
-	let fileInput: HTMLInputElement;
+	let fileInput = $state<HTMLInputElement | null>(null);
 
 	let isNutritionLabel = $state(false);
 	let servingSize = $state<string | null>(null);
@@ -130,22 +135,16 @@
 			imageKey = result.imageKey;
 			analyzed = true;
 
-			// Handle nutrition label detection
 			isNutritionLabel = result.isNutritionLabel ?? false;
 			servingSize = result.servingSize ?? null;
 			servingQuantity = result.servingQuantity ?? null;
 			servingUnit = result.servingUnit ?? null;
 
-			// Set initial amount based on whether it's a label
 			if (isNutritionLabel && servingQuantity) {
 				amountEaten = String(servingQuantity);
 			} else {
 				amountEaten = '1';
 			}
-
-			toast.success(isNutritionLabel ? 'Label scanned!' : 'Meal analyzed!', {
-				description: `${result.name} - ${result.calories} kcal${servingSize ? ` per ${servingSize}` : ''}`
-			});
 		} catch (err: unknown) {
 			console.error('Analysis failed', err);
 			const message = err instanceof Error ? err.message : 'Failed to analyze meal';
@@ -176,10 +175,6 @@
 			analyzed = true;
 			isNutritionLabel = false;
 			amountEaten = '1';
-
-			toast.success('Meal analyzed!', {
-				description: `${result.name} - ${result.calories} kcal`
-			});
 		} catch (err: unknown) {
 			console.error('Text analysis failed', err);
 			const message = err instanceof Error ? err.message : 'Failed to analyze description';
@@ -295,7 +290,6 @@
 				Manual
 			</button>
 		</div>
-
 		{#if mode === 'camera'}
 			<div class="relative">
 				<button
@@ -331,7 +325,6 @@
 						</div>
 						<p class="text-sm font-medium">Take a photo</p>
 					{/if}
-
 					{#if analyzing}
 						<div
 							class="bg-background/90 absolute inset-0 flex flex-col items-center justify-center backdrop-blur-sm"
@@ -342,7 +335,6 @@
 							<p class="text-sm font-medium mt-3">Analyzing...</p>
 						</div>
 					{/if}
-
 					<input
 						type="file"
 						accept="image/jpeg,image/png,image/webp,image/heic"
@@ -352,7 +344,6 @@
 						class="hidden"
 					/>
 				</button>
-
 				{#if imagePreview && !analyzing}
 					<button
 						type="button"
@@ -394,21 +385,18 @@
 				</Button>
 			</div>
 		{/if}
-
-		<!-- Results & Form Fields -->
 		<div class="space-y-4">
 			<div class="space-y-2">
 				<Label for="name">Meal Name</Label>
-				<InputGroup.Root>
-					<InputGroup.Input
+				<InputGroup>
+					<InputGroupInput
 						id="name"
 						type="text"
 						placeholder="e.g., Grilled Chicken Salad"
 						bind:value={name}
 					/>
-				</InputGroup.Root>
+				</InputGroup>
 			</div>
-
 			{#if isNutritionLabel && servingSize && servingUnit}
 				<div class="space-y-3">
 					<div class="flex items-center justify-between">
@@ -417,8 +405,8 @@
 							Label: {servingSize} per serving
 						</span>
 					</div>
-					<InputGroup.Root>
-						<InputGroup.Input
+					<InputGroup>
+						<InputGroupInput
 							id="amount"
 							type="number"
 							inputmode="decimal"
@@ -428,10 +416,10 @@
 							bind:value={amountEaten}
 							class="text-lg font-semibold"
 						/>
-						<InputGroup.Addon>
-							<InputGroup.Text class="font-medium">{servingUnit}</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+						<InputGroupAddon>
+							<InputGroupText class="font-medium">{servingUnit}</InputGroupText>
+						</InputGroupAddon>
+					</InputGroup>
 
 					<div class="flex gap-2">
 						<button
@@ -463,7 +451,6 @@
 							2×
 						</button>
 					</div>
-
 					<div class="rounded-xl bg-muted/30 p-4">
 						<div class="flex items-center justify-between mb-3">
 							<span class="text-sm font-medium text-muted-foreground">Your total</span>
@@ -488,8 +475,8 @@
 				<div class="grid grid-cols-2 gap-4">
 					<div class="space-y-2">
 						<Label for="calories">Calories</Label>
-						<InputGroup.Root>
-							<InputGroup.Input
+						<InputGroup>
+							<InputGroupInput
 								id="calories"
 								type="number"
 								inputmode="numeric"
@@ -497,16 +484,16 @@
 								value={baseCalories || ''}
 								oninput={(e) => handleManualCaloriesInput(e.currentTarget.value)}
 							/>
-							<InputGroup.Addon>
-								<InputGroup.Text>kcal</InputGroup.Text>
-							</InputGroup.Addon>
-						</InputGroup.Root>
+							<InputGroupAddon>
+								<InputGroupText>kcal</InputGroupText>
+							</InputGroupAddon>
+						</InputGroup>
 					</div>
 
 					<div class="space-y-2">
 						<Label for="servings">Servings</Label>
-						<InputGroup.Root>
-							<InputGroup.Input
+						<InputGroup>
+							<InputGroupInput
 								id="servings"
 								type="number"
 								inputmode="decimal"
@@ -515,15 +502,15 @@
 								placeholder="1"
 								bind:value={amountEaten}
 							/>
-						</InputGroup.Root>
+						</InputGroup>
 					</div>
 				</div>
 
 				<div class="grid grid-cols-3 gap-3">
 					<div class="space-y-2">
 						<Label for="protein" class="text-xs text-muted-foreground">Protein</Label>
-						<InputGroup.Root>
-							<InputGroup.Input
+						<InputGroup>
+							<InputGroupInput
 								id="protein"
 								type="number"
 								inputmode="numeric"
@@ -532,15 +519,15 @@
 								oninput={(e) => handleManualProteinInput(e.currentTarget.value)}
 								class="text-center"
 							/>
-							<InputGroup.Addon>
-								<InputGroup.Text class="px-2">g</InputGroup.Text>
-							</InputGroup.Addon>
-						</InputGroup.Root>
+							<InputGroupAddon>
+								<InputGroupText class="px-2">g</InputGroupText>
+							</InputGroupAddon>
+						</InputGroup>
 					</div>
 					<div class="space-y-2">
 						<Label for="carbs" class="text-xs text-muted-foreground">Carbs</Label>
-						<InputGroup.Root>
-							<InputGroup.Input
+						<InputGroup>
+							<InputGroupInput
 								id="carbs"
 								type="number"
 								inputmode="numeric"
@@ -549,15 +536,15 @@
 								oninput={(e) => handleManualCarbsInput(e.currentTarget.value)}
 								class="text-center"
 							/>
-							<InputGroup.Addon>
-								<InputGroup.Text class="px-2">g</InputGroup.Text>
-							</InputGroup.Addon>
-						</InputGroup.Root>
+							<InputGroupAddon>
+								<InputGroupText class="px-2">g</InputGroupText>
+							</InputGroupAddon>
+						</InputGroup>
 					</div>
 					<div class="space-y-2">
 						<Label for="fat" class="text-xs text-muted-foreground">Fat</Label>
-						<InputGroup.Root>
-							<InputGroup.Input
+						<InputGroup>
+							<InputGroupInput
 								id="fat"
 								type="number"
 								inputmode="numeric"
@@ -566,10 +553,10 @@
 								oninput={(e) => handleManualFatInput(e.currentTarget.value)}
 								class="text-center"
 							/>
-							<InputGroup.Addon>
-								<InputGroup.Text class="px-2">g</InputGroup.Text>
-							</InputGroup.Addon>
-						</InputGroup.Root>
+							<InputGroupAddon>
+								<InputGroupText class="px-2">g</InputGroupText>
+							</InputGroupAddon>
+						</InputGroup>
 					</div>
 				</div>
 

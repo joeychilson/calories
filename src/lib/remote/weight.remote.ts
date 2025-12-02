@@ -1,7 +1,6 @@
 import { command, getRequestEvent, query } from '$app/server';
-import { optimizeCaloriesWithAI } from '$lib/server/ai';
 import { db } from '$lib/server/db';
-import { settings, weightLogs } from '$lib/server/schema';
+import { weightLogs } from '$lib/server/schema';
 import { error } from '@sveltejs/kit';
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -78,94 +77,3 @@ export const getLatestWeight = query(async () => {
 		date: latest.date.toISOString().split('T')[0]
 	};
 });
-
-export const getSettings = query(async () => {
-	const { locals } = getRequestEvent();
-	if (!locals.session || !locals.user) {
-		return error(401, 'Unauthorized');
-	}
-
-	const [userSettings] = await db
-		.select()
-		.from(settings)
-		.where(eq(settings.userId, locals.user.id));
-
-	if (!userSettings) {
-		const [newSettings] = await db
-			.insert(settings)
-			.values({
-				userId: locals.user.id,
-				calorieGoal: 2200,
-				weightGoal: null,
-				weightUnit: 'lbs'
-			})
-			.returning();
-
-		return {
-			calorieGoal: newSettings.calorieGoal,
-			weightGoal: newSettings.weightGoal,
-			weightUnit: newSettings.weightUnit
-		};
-	}
-
-	return {
-		calorieGoal: userSettings.calorieGoal,
-		weightGoal: userSettings.weightGoal,
-		weightUnit: userSettings.weightUnit
-	};
-});
-
-export const updateSettings = command(
-	z.object({
-		calorieGoal: z.number().int().positive().optional(),
-		weightGoal: z.number().positive().optional(),
-		weightUnit: z.enum(['lbs', 'kg']).optional()
-	}),
-	async (input) => {
-		const { locals } = getRequestEvent();
-
-		if (!locals.session || !locals.user) {
-			return error(401, 'Unauthorized');
-		}
-
-		const [updated] = await db
-			.update(settings)
-			.set({
-				...(input.calorieGoal !== undefined && { calorieGoal: input.calorieGoal }),
-				...(input.weightGoal !== undefined && { weightGoal: input.weightGoal }),
-				...(input.weightUnit !== undefined && { weightUnit: input.weightUnit }),
-				updatedAt: new Date()
-			})
-			.where(eq(settings.userId, locals.user.id))
-			.returning();
-
-		if (!updated) {
-			return error(404, 'Settings not found');
-		}
-
-		return {
-			calorieGoal: updated.calorieGoal,
-			weightGoal: updated.weightGoal,
-			weightUnit: updated.weightUnit
-		};
-	}
-);
-
-export const optimizeCalories = command(
-	z.object({
-		currentWeight: z.number().positive(),
-		goalWeight: z.number().positive(),
-		unit: z.string()
-	}),
-	async (input) => {
-		const { locals } = getRequestEvent();
-
-		if (!locals.session || !locals.user) {
-			return error(401, 'Unauthorized');
-		}
-
-		const result = await optimizeCaloriesWithAI(input.currentWeight, input.goalWeight, input.unit);
-
-		return result;
-	}
-);

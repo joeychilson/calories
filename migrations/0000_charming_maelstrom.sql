@@ -48,6 +48,7 @@ CREATE TABLE "settings" (
 	"calorie_goal" integer DEFAULT 2200 NOT NULL,
 	"weight_goal" real,
 	"weight_unit" text DEFAULT 'lbs' NOT NULL,
+	"onboarding_completed" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp NOT NULL,
 	"updated_at" timestamp NOT NULL,
 	CONSTRAINT "settings_user_id_unique" UNIQUE("user_id")

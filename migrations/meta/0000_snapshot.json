@@ -1,5 +1,5 @@
 {
-	"id": "9d45ebe8-8872-4a8f-9c11-2487ee3ad0d6",
+	"id": "7bf4c6c8-b898-4297-9171-8bc8c7edd927",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"version": "7",
 	"dialect": "postgresql",
@@ -416,6 +416,13 @@
 					"primaryKey": false,
 					"notNull": true,
 					"default": "'lbs'"
+				},
+				"onboarding_completed": {
+					"name": "onboarding_completed",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
 				},
 				"created_at": {
 					"name": "created_at",

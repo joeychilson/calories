@@ -16,7 +16,8 @@
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 	import { addMeal, deleteMeal, getMeals, updateMeal } from '$lib/remote/meals.remote';
-	import { getLatestWeight, getSettings, logWeight } from '$lib/remote/weight.remote';
+	import { getSettings } from '$lib/remote/settings.remote';
+	import { getLatestWeight, logWeight } from '$lib/remote/weight.remote';
 	import { formatDate, formatTime, getDisplayDate } from '$lib/utils/format';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';

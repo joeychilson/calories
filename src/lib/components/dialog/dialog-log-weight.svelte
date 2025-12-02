@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import * as InputGroup from '$lib/components/ui/input-group/index.js';
+	import {
+		InputGroup,
+		InputGroupAddon,
+		InputGroupInput,
+		InputGroupText
+	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
 	import ResponsiveDialog from './dialog-responsive.svelte';
 
@@ -40,18 +45,18 @@
 	<div class="space-y-6 py-4">
 		<div class="space-y-2">
 			<Label for="weight">Current Weight</Label>
-			<InputGroup.Root>
-				<InputGroup.Input
+			<InputGroup>
+				<InputGroupInput
 					id="weight"
 					type="number"
 					step="0.1"
 					placeholder="0.0"
 					bind:value={weight}
 				/>
-				<InputGroup.Addon>
-					<InputGroup.Text>{unit}</InputGroup.Text>
-				</InputGroup.Addon>
-			</InputGroup.Root>
+				<InputGroupAddon>
+					<InputGroupText>{unit}</InputGroupText>
+				</InputGroupAddon>
+			</InputGroup>
 		</div>
 
 		<Button onclick={handleSubmit} disabled={!weight} class="w-full">Save Weight</Button>

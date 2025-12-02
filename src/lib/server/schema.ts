@@ -98,6 +98,7 @@ export const settings = pgTable(
 		calorieGoal: integer('calorie_goal').default(2200).notNull(),
 		weightGoal: real('weight_goal'),
 		weightUnit: text('weight_unit').default('lbs').notNull(),
+		onboardingCompleted: boolean('onboarding_completed').default(false).notNull(),
 		createdAt: timestamp('created_at')
 			.$defaultFn(() => new Date())
 			.notNull(),

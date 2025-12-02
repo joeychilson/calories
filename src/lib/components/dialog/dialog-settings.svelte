@@ -1,8 +1,13 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import * as InputGroup from '$lib/components/ui/input-group/index.js';
+	import {
+		InputGroup,
+		InputGroupAddon,
+		InputGroupInput,
+		InputGroupText
+	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
-	import { optimizeCalories, updateSettings } from '$lib/remote/weight.remote';
+	import { optimizeCalories, updateSettings } from '$lib/remote/settings.remote';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
@@ -112,18 +117,18 @@
 
 		<div class="space-y-2">
 			<Label for="weightGoal">Goal Weight</Label>
-			<InputGroup.Root>
-				<InputGroup.Input
+			<InputGroup>
+				<InputGroupInput
 					id="weightGoal"
 					type="number"
 					step="0.1"
 					placeholder="Enter goal weight"
 					bind:value={weightGoal}
 				/>
-				<InputGroup.Addon>
-					<InputGroup.Text>{weightUnit}</InputGroup.Text>
-				</InputGroup.Addon>
-			</InputGroup.Root>
+				<InputGroupAddon>
+					<InputGroupText>{weightUnit}</InputGroupText>
+				</InputGroupAddon>
+			</InputGroup>
 		</div>
 
 		{#if currentWeight && weightGoal}
@@ -160,17 +165,17 @@
 
 		<div class="space-y-2">
 			<Label for="calorieGoal">Daily Calorie Goal</Label>
-			<InputGroup.Root>
-				<InputGroup.Input
+			<InputGroup>
+				<InputGroupInput
 					id="calorieGoal"
 					type="number"
 					placeholder="2200"
 					bind:value={calorieGoal}
 				/>
-				<InputGroup.Addon>
-					<InputGroup.Text>kcal</InputGroup.Text>
-				</InputGroup.Addon>
-			</InputGroup.Root>
+				<InputGroupAddon>
+					<InputGroupText>kcal</InputGroupText>
+				</InputGroupAddon>
+			</InputGroup>
 			{#if !aiResult}
 				<p class="text-xs text-muted-foreground">
 					Or enter your goal weight above and let AI calculate the optimal calories.

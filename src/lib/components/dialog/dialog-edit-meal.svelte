@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import * as InputGroup from '$lib/components/ui/input-group/index.js';
+	import {
+		InputGroup,
+		InputGroupAddon,
+		InputGroupInput,
+		InputGroupText
+	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ResponsiveDialog from './dialog-responsive.svelte';
@@ -97,14 +102,14 @@
 		<div class="space-y-4">
 			<div class="space-y-2">
 				<Label for="edit-name">Meal Name</Label>
-				<InputGroup.Root>
-					<InputGroup.Input
+				<InputGroup>
+					<InputGroupInput
 						id="edit-name"
 						type="text"
 						placeholder="e.g., Grilled Chicken Salad"
 						bind:value={name}
 					/>
-				</InputGroup.Root>
+				</InputGroup>
 			</div>
 
 			<div class="grid grid-cols-2 gap-4">
@@ -113,8 +118,8 @@
 						>Calories <span class="text-muted-foreground text-xs font-normal">(per serving)</span
 						></Label
 					>
-					<InputGroup.Root>
-						<InputGroup.Input
+					<InputGroup>
+						<InputGroupInput
 							id="edit-calories"
 							type="number"
 							inputmode="numeric"
@@ -122,16 +127,16 @@
 							value={baseCalories || ''}
 							oninput={(e) => handleBaseCaloriesInput(e.currentTarget.value)}
 						/>
-						<InputGroup.Addon>
-							<InputGroup.Text>kcal</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+						<InputGroupAddon>
+							<InputGroupText>kcal</InputGroupText>
+						</InputGroupAddon>
+					</InputGroup>
 				</div>
 
 				<div class="space-y-2">
 					<Label for="edit-servings">Servings</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
+					<InputGroup>
+						<InputGroupInput
 							id="edit-servings"
 							type="number"
 							inputmode="decimal"
@@ -140,15 +145,15 @@
 							placeholder="1"
 							bind:value={servings}
 						/>
-					</InputGroup.Root>
+					</InputGroup>
 				</div>
 			</div>
 
 			<div class="grid grid-cols-3 gap-3">
 				<div class="space-y-2">
 					<Label for="edit-protein" class="text-xs text-muted-foreground">Protein</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
+					<InputGroup>
+						<InputGroupInput
 							id="edit-protein"
 							type="number"
 							inputmode="numeric"
@@ -157,15 +162,15 @@
 							oninput={(e) => handleBaseProteinInput(e.currentTarget.value)}
 							class="text-center"
 						/>
-						<InputGroup.Addon>
-							<InputGroup.Text class="px-2">g</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+						<InputGroupAddon>
+							<InputGroupText class="px-2">g</InputGroupText>
+						</InputGroupAddon>
+					</InputGroup>
 				</div>
 				<div class="space-y-2">
 					<Label for="edit-carbs" class="text-xs text-muted-foreground">Carbs</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
+					<InputGroup>
+						<InputGroupInput
 							id="edit-carbs"
 							type="number"
 							inputmode="numeric"
@@ -174,15 +179,15 @@
 							oninput={(e) => handleBaseCarbsInput(e.currentTarget.value)}
 							class="text-center"
 						/>
-						<InputGroup.Addon>
-							<InputGroup.Text class="px-2">g</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+						<InputGroupAddon>
+							<InputGroupText class="px-2">g</InputGroupText>
+						</InputGroupAddon>
+					</InputGroup>
 				</div>
 				<div class="space-y-2">
 					<Label for="edit-fat" class="text-xs text-muted-foreground">Fat</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
+					<InputGroup>
+						<InputGroupInput
 							id="edit-fat"
 							type="number"
 							inputmode="numeric"
@@ -191,10 +196,10 @@
 							oninput={(e) => handleBaseFatInput(e.currentTarget.value)}
 							class="text-center"
 						/>
-						<InputGroup.Addon>
-							<InputGroup.Text class="px-2">g</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+						<InputGroupAddon>
+							<InputGroupText class="px-2">g</InputGroupText>
+						</InputGroupAddon>
+					</InputGroup>
 				</div>
 			</div>
 

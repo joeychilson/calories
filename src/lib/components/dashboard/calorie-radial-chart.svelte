@@ -23,18 +23,11 @@
 	const CENTER = $derived(size / 2);
 	const RADIUS = $derived(size / 2 - thickness);
 
-	// Generate consistently spaced segments
 	let segments = $derived.by(() => {
 		let currentAngle = 0;
-		const gapSize = meals.length > 1 ? 2 : 0; // Degrees of gap
+		const gapSize = meals.length > 1 ? 2 : 0;
 
-		// If we have meals, map them.
 		return meals.map((meal, i) => {
-			// Calculate this meal's share of the *filled* portion (not total goal)
-			// to make segments proportional to each other within the progress arc?
-			// Actually, usually radial charts show relative size to goal.
-			// Let's stick to: (meal.cals / goal) * 360.
-
 			const percentage = Math.min(meal.calories / goal, 1);
 			const angleSize = percentage * 360;
 
@@ -56,7 +49,6 @@
 	let totalCalories = $derived(meals.reduce((acc, m) => acc + m.calories, 0));
 	let remaining = $derived(Math.max(0, goal - totalCalories));
 
-	// Function to create arc path
 	function describeArc(startAngle: number, endAngle: number) {
 		const start = polarToCartesian(CENTER, CENTER, RADIUS, endAngle);
 		const end = polarToCartesian(CENTER, CENTER, RADIUS, startAngle);
@@ -86,7 +78,6 @@
 		viewBox="0 0 {size} {size}"
 		class="rotate-0 transform transition-all duration-500 ease-out"
 	>
-		<!-- Background Circle -->
 		<circle
 			cx={CENTER}
 			cy={CENTER}
@@ -96,8 +87,6 @@
 			stroke-width={thickness}
 			stroke-linecap="round"
 		/>
-
-		<!-- Segments -->
 		{#each segments as segment (segment.id)}
 			<path
 				d={describeArc(segment.start, segment.end)}
@@ -110,8 +99,6 @@
 			/>
 		{/each}
 	</svg>
-
-	<!-- Center Content -->
 	<div class="absolute inset-0 flex flex-col items-center justify-center text-center">
 		<span class="text-sm font-medium text-muted-foreground">Remaining</span>
 		<span class="text-4xl font-bold tracking-tighter text-foreground">{remaining}</span>

@@ -33,10 +33,6 @@
 		protein?: number;
 		carbs?: number;
 		fat?: number;
-		sodium?: number;
-		cholesterol?: number;
-		fiber?: number;
-		sugar?: number;
 		imageKey?: string;
 	};
 

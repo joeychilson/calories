@@ -342,12 +342,19 @@
 							</div>
 						{:else}
 							<div class="space-y-2 pb-4">
-								{#each currentDayMeals as meal (meal.id)}
+								{#each currentDayMeals as meal, i (meal.id)}
 									<div
 										transition:slide={{ duration: 200 }}
 										class="group relative overflow-hidden rounded-2xl bg-muted/30 transition-colors hover:bg-muted/50"
 									>
 										<div class="flex items-stretch">
+											<!-- Chart color indicator -->
+											<div
+												class="w-1 shrink-0 rounded-l-2xl"
+												style="background-color: var(--chart-{(i % 5) + 1})"
+											></div>
+
+											<!-- Image Section -->
 											<div class="relative w-20 shrink-0">
 												{#if meal.image}
 													<img

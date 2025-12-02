@@ -3,65 +3,91 @@ import { z } from 'zod';
 import { openrouter } from './openrouter';
 
 const mealAnalysisSchema = z.object({
-	isFood: z.boolean().describe('Whether the image contains food or a meal'),
+	isFood: z
+		.boolean()
+		.describe('Whether the image contains food, a meal, or a nutrition facts label'),
 	rejectionReason: z
 		.string()
 		.optional()
 		.describe(
 			'If not food, explain why (e.g., "This appears to be a pet", "This is a landscape photo")'
 		),
+	isNutritionLabel: z
+		.boolean()
+		.describe('Whether the image is a nutrition facts label or packaged food with visible label'),
 	name: z
 		.string()
 		.describe(
-			'A concise, descriptive name for the meal (e.g., "Grilled Chicken Salad", "Pepperoni Pizza Slice")'
+			'A concise, descriptive name for the meal or product (e.g., "Grilled Chicken Salad", "Pepperoni Pizza Slice", "Peanut Butter")'
 		),
-	calories: z.number().int().describe('Estimated total calories'),
-	protein: z.number().int().describe('Estimated protein in grams'),
-	carbs: z.number().int().describe('Estimated carbohydrates in grams'),
-	fat: z.number().int().describe('Estimated fat in grams'),
-	sodium: z.number().int().describe('Estimated sodium in milligrams'),
-	cholesterol: z.number().int().describe('Estimated cholesterol in milligrams'),
-	fiber: z.number().int().describe('Estimated fiber in grams'),
-	sugar: z.number().int().describe('Estimated sugar in grams')
+	servingSize: z
+		.string()
+		.optional()
+		.describe(
+			'The serving size as shown on a nutrition label (e.g., "2 tbsp", "1 cup", "3 cookies", "28g"). Only include if from a nutrition label.'
+		),
+	servingQuantity: z
+		.number()
+		.optional()
+		.describe('The numeric portion of the serving size (e.g., 2 for "2 tbsp", 1 for "1 cup")'),
+	servingUnit: z
+		.string()
+		.optional()
+		.describe(
+			'The unit of the serving size (e.g., "tbsp", "cup", "cookies", "g", "oz", "pieces", "slices")'
+		),
+	calories: z.number().int().describe('Total calories (per serving if from a nutrition label)'),
+	protein: z.number().int().describe('Protein in grams (per serving if from a nutrition label)'),
+	carbs: z
+		.number()
+		.int()
+		.describe('Carbohydrates in grams (per serving if from a nutrition label)'),
+	fat: z.number().int().describe('Fat in grams (per serving if from a nutrition label)')
 });
 
 export type MealAnalysis = z.infer<typeof mealAnalysisSchema>;
 
-const SYSTEM_PROMPT = `You are a nutrition analysis expert. Your job is to analyze photos of food and provide accurate nutritional estimates.
+const SYSTEM_PROMPT = `You are a nutrition analysis expert. Your job is to analyze photos of food OR nutrition facts labels and provide accurate nutritional information.
 
 IMPORTANT RULES:
-1. ONLY analyze images that clearly contain food or beverages.
-2. If the image does NOT contain food (e.g., pets, people, landscapes, objects, screenshots), set isFood to false and provide a brief rejectionReason.
-3. When analyzing food, estimate portion sizes carefully based on visual cues (plate size, utensils, hands for scale).
-4. Be realistic with calorie estimates - don't underestimate. Most restaurant meals are 600-1200 calories.
-5. For homemade meals, consider typical ingredient amounts.
-6. If multiple items are visible, sum up the total nutritional content.
-7. Round all numbers to reasonable values (calories to nearest 10, macros to nearest gram).
+1. Accept BOTH food photos AND nutrition facts labels as valid input.
+2. If the image does NOT contain food or a nutrition label (e.g., pets, people, landscapes, random objects), set isFood to false and provide a brief rejectionReason.
+3. DETECT if the image is a NUTRITION FACTS LABEL and set isNutritionLabel accordingly.
 
-ESTIMATION GUIDELINES:
-- A typical dinner plate is ~10-11 inches
-- A fist-sized portion of meat is ~3-4 oz
-- A cup of rice/pasta is about the size of a tennis ball
-- Salad dressings add 100-200 calories per serving
-- Cooking oils add ~120 calories per tablespoon
-- Cheese adds ~100 calories per oz`;
+FOR NUTRITION FACTS LABELS (set isNutritionLabel to true):
+- Set isFood to true (labels ARE valid input)
+- READ the exact values from the label - do NOT estimate
+- EXTRACT the serving size exactly as shown (e.g., "2 tbsp (32g)", "1 cup", "3 cookies")
+- Parse the serving size into servingQuantity (the number) and servingUnit (the unit)
+- Use the product name for the meal name
+- Return values PER SERVING as shown on the label
 
-const USER_PROMPT = `Analyze this food image and provide detailed nutritional information.
+FOR FOOD PHOTOS (set isNutritionLabel to false):
+- Do NOT include servingSize, servingQuantity, or servingUnit
+- Estimate portion sizes carefully based on visual cues (plate size, utensils, hands for scale)
+- Be realistic with calorie estimates - don't underestimate. Most restaurant meals are 600-1200 calories.
+- For homemade meals, consider typical ingredient amounts.
+- If multiple items are visible, sum up the total nutritional content.
 
-If this is NOT a photo of food or a meal, set isFood to false and explain why in rejectionReason.
+Round all numbers to reasonable values (calories to nearest 10, macros to nearest gram).`;
 
-If this IS food, provide your best estimates for:
-- A descriptive name for the meal
-- Total calories
-- Protein (grams)
-- Carbohydrates (grams)
-- Fat (grams)
-- Sodium (milligrams)
-- Cholesterol (milligrams)
-- Fiber (grams)
-- Sugar (grams)
+const USER_PROMPT = `Analyze this image and provide nutritional information.
 
-Be accurate but realistic. Most people underestimate calories, so err on the side of slightly higher estimates when uncertain.`;
+FIRST, determine what type of image this is:
+1. If NOT food or a nutrition label → set isFood to false, explain in rejectionReason
+2. If a NUTRITION FACTS LABEL → set isNutritionLabel to true, READ exact values from label
+3. If a FOOD PHOTO → set isNutritionLabel to false, ESTIMATE values for what's visible
+
+FOR NUTRITION LABELS:
+- Read the serving size exactly (e.g., "2 tbsp (32g)", "1 cup", "28g")
+- Extract servingQuantity (number) and servingUnit (unit like "tbsp", "cup", "g", "pieces")
+- Copy all nutritional values exactly as shown PER SERVING
+- Use the product name for the meal name
+
+FOR FOOD PHOTOS:
+- Do NOT include servingSize, servingQuantity, or servingUnit
+- Estimate nutritional values for the entire visible portion
+- Be accurate but realistic - most people underestimate calories`;
 
 export async function analyzeMealFromImage(
 	base64Data: string,
@@ -88,16 +114,13 @@ export async function analyzeMealFromImage(
 	if (!object.isFood) {
 		return {
 			isFood: false,
+			isNutritionLabel: false,
 			rejectionReason: object.rejectionReason || 'This does not appear to be food.',
 			name: '',
 			calories: 0,
 			protein: 0,
 			carbs: 0,
-			fat: 0,
-			sodium: 0,
-			cholesterol: 0,
-			fiber: 0,
-			sugar: 0
+			fat: 0
 		};
 	}
 

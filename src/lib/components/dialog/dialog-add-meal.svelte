@@ -7,6 +7,7 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import TagIcon from '@lucide/svelte/icons/tag';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { toast } from 'svelte-sonner';
 	import ResponsiveDialog from './dialog-responsive.svelte';
@@ -34,28 +35,57 @@
 	} = $props();
 
 	let name = $state('');
-	let servings = $state('1');
-	let calories = $state('');
-	let protein = $state('');
-	let carbs = $state('');
-	let fat = $state('');
 	let imagePreview = $state<string | null>(null);
 	let imageKey = $state<string | null>(null);
 	let analyzing = $state(false);
 	let analyzed = $state(false);
 	let fileInput: HTMLInputElement;
 
+	// Serving size info from nutrition labels
+	let isNutritionLabel = $state(false);
+	let servingSize = $state<string | null>(null);
+	let servingQuantity = $state<number | null>(null);
+	let servingUnit = $state<string | null>(null);
+
+	// Per-serving values (base values from AI)
+	let baseCalories = $state(0);
+	let baseProtein = $state(0);
+	let baseCarbs = $state(0);
+	let baseFat = $state(0);
+
+	// User input - amount they ate in the serving unit
+	let amountEaten = $state('1');
+
+	// Calculate servings from amount eaten
+	let servings = $derived.by(() => {
+		const amount = parseFloat(amountEaten) || 0;
+		if (!isNutritionLabel || !servingQuantity) {
+			return amount;
+		}
+		return amount / servingQuantity;
+	});
+
+	// Calculate final values based on servings
+	let calories = $derived(Math.round(baseCalories * servings));
+	let protein = $derived(Math.round(baseProtein * servings));
+	let carbs = $derived(Math.round(baseCarbs * servings));
+	let fat = $derived(Math.round(baseFat * servings));
+
 	function reset() {
 		name = '';
-		servings = '1';
-		calories = '';
-		protein = '';
-		carbs = '';
-		fat = '';
+		amountEaten = '1';
+		baseCalories = 0;
+		baseProtein = 0;
+		baseCarbs = 0;
+		baseFat = 0;
 		imagePreview = null;
 		imageKey = null;
 		analyzing = false;
 		analyzed = false;
+		isNutritionLabel = false;
+		servingSize = null;
+		servingQuantity = null;
+		servingUnit = null;
 	}
 
 	function fileToBase64(file: File): Promise<string> {
@@ -91,16 +121,28 @@
 			});
 
 			name = result.name;
-			servings = '1';
-			calories = String(result.calories);
-			protein = String(result.protein);
-			carbs = String(result.carbs);
-			fat = String(result.fat);
+			baseCalories = result.calories;
+			baseProtein = result.protein;
+			baseCarbs = result.carbs;
+			baseFat = result.fat;
 			imageKey = result.imageKey;
 			analyzed = true;
 
-			toast.success('Meal analyzed!', {
-				description: `${result.name} - ${result.calories} kcal`
+			// Handle nutrition label detection
+			isNutritionLabel = result.isNutritionLabel ?? false;
+			servingSize = result.servingSize ?? null;
+			servingQuantity = result.servingQuantity ?? null;
+			servingUnit = result.servingUnit ?? null;
+
+			// Set initial amount based on whether it's a label
+			if (isNutritionLabel && servingQuantity) {
+				amountEaten = String(servingQuantity);
+			} else {
+				amountEaten = '1';
+			}
+
+			toast.success(isNutritionLabel ? 'Label scanned!' : 'Meal analyzed!', {
+				description: `${result.name} - ${result.calories} kcal${servingSize ? ` per ${servingSize}` : ''}`
 			});
 		} catch (err: unknown) {
 			console.error('Analysis failed', err);
@@ -117,19 +159,23 @@
 		imagePreview = null;
 		imageKey = null;
 		analyzed = false;
+		isNutritionLabel = false;
+		servingSize = null;
+		servingQuantity = null;
+		servingUnit = null;
 		if (fileInput) fileInput.value = '';
 	}
 
 	function handleSubmit() {
-		if (!name || !calories) return;
+		if (!name || calories <= 0) return;
 
 		onAdd?.({
 			name,
-			servings: parseFloat(servings) || 1,
-			calories: parseInt(calories),
-			protein: protein ? parseInt(protein) : undefined,
-			carbs: carbs ? parseInt(carbs) : undefined,
-			fat: fat ? parseInt(fat) : undefined,
+			servings: servings || 1,
+			calories,
+			protein: protein || undefined,
+			carbs: carbs || undefined,
+			fat: fat || undefined,
 			imageKey: imageKey || undefined
 		});
 
@@ -137,28 +183,30 @@
 		reset();
 	}
 
-	function handleServingsInput(e: Event & { currentTarget: HTMLInputElement }) {
-		const newVal = e.currentTarget.value;
-		const oldValNum = parseFloat(servings);
-		const newValNum = parseFloat(newVal);
-
-		// If we have valid numbers for both and they are different
-		if (
-			!isNaN(oldValNum) &&
-			!isNaN(newValNum) &&
-			oldValNum > 0 &&
-			newValNum > 0 &&
-			oldValNum !== newValNum
-		) {
-			const ratio = newValNum / oldValNum;
-
-			if (calories) calories = String(Math.round(parseInt(calories) * ratio));
-			if (protein) protein = String(Math.round(parseInt(protein) * ratio));
-			if (carbs) carbs = String(Math.round(parseInt(carbs) * ratio));
-			if (fat) fat = String(Math.round(parseInt(fat) * ratio));
+	function setQuickAmount(multiplier: number) {
+		if (isNutritionLabel && servingQuantity) {
+			amountEaten = String(servingQuantity * multiplier);
+		} else {
+			amountEaten = String(multiplier);
 		}
+	}
 
-		servings = newVal;
+	// For manual entry mode (non-label)
+	function handleManualCaloriesInput(value: string) {
+		baseCalories = parseInt(value) || 0;
+		amountEaten = '1';
+	}
+
+	function handleManualProteinInput(value: string) {
+		baseProtein = parseInt(value) || 0;
+	}
+
+	function handleManualCarbsInput(value: string) {
+		baseCarbs = parseInt(value) || 0;
+	}
+
+	function handleManualFatInput(value: string) {
+		baseFat = parseInt(value) || 0;
 	}
 </script>
 
@@ -180,11 +228,22 @@
 				{#if imagePreview}
 					<img src={imagePreview} alt="Preview" class="h-full w-full object-cover" />
 					{#if analyzed}
-						<div
-							class="absolute top-3 left-3 bg-emerald-500 text-white px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm"
-						>
-							<SparklesIcon class="size-3" />
-							AI Analyzed
+						<div class="absolute top-3 left-3 flex items-center gap-2">
+							{#if isNutritionLabel}
+								<div
+									class="bg-blue-500 text-white px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm"
+								>
+									<TagIcon class="size-3" />
+									Label Scanned
+								</div>
+							{:else}
+								<div
+									class="bg-emerald-500 text-white px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm"
+								>
+									<SparklesIcon class="size-3" />
+									AI Analyzed
+								</div>
+							{/if}
 						</div>
 					{/if}
 				{:else}
@@ -240,97 +299,210 @@
 				</InputGroup.Root>
 			</div>
 
-			<div class="grid grid-cols-2 gap-4">
-				<div class="space-y-2">
-					<Label for="calories">Calories</Label>
+			<!-- Serving Size Input - Different UX for labels vs food photos -->
+			{#if isNutritionLabel && servingSize && servingUnit}
+				<!-- Nutrition Label Mode: Input amount in the serving unit -->
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<Label for="amount">How much did you eat?</Label>
+						<span class="text-xs text-muted-foreground">
+							Label: {servingSize} per serving
+						</span>
+					</div>
 					<InputGroup.Root>
 						<InputGroup.Input
-							id="calories"
+							id="amount"
 							type="number"
-							inputmode="numeric"
-							placeholder="0"
-							bind:value={calories}
-						/>
-						<InputGroup.Addon>
-							<InputGroup.Text>kcal</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="servings">Servings</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
-							id="servings"
-							type="number"
-							inputmode="numeric"
-							step="0.5"
+							inputmode="decimal"
+							step="any"
 							min="0"
-							placeholder="1"
-							value={servings}
-							oninput={handleServingsInput}
+							placeholder={String(servingQuantity ?? 1)}
+							bind:value={amountEaten}
+							class="text-lg font-semibold"
 						/>
+						<InputGroup.Addon>
+							<InputGroup.Text class="font-medium">{servingUnit}</InputGroup.Text>
+						</InputGroup.Addon>
 					</InputGroup.Root>
-				</div>
-			</div>
 
-			<!-- Macros -->
-			<div class="grid grid-cols-3 gap-3">
-				<div class="space-y-2">
-					<Label for="protein" class="text-xs text-muted-foreground">Protein</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
-							id="protein"
-							type="number"
-							inputmode="numeric"
-							placeholder="0"
-							bind:value={protein}
-							class="text-center"
-						/>
-						<InputGroup.Addon>
-							<InputGroup.Text class="px-2">g</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+					<!-- Quick amount buttons -->
+					<div class="flex gap-2">
+						<button
+							type="button"
+							class="flex-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50"
+							onclick={() => setQuickAmount(0.5)}
+						>
+							½×
+						</button>
+						<button
+							type="button"
+							class="flex-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50"
+							onclick={() => setQuickAmount(1)}
+						>
+							1×
+						</button>
+						<button
+							type="button"
+							class="flex-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50"
+							onclick={() => setQuickAmount(1.5)}
+						>
+							1½×
+						</button>
+						<button
+							type="button"
+							class="flex-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50"
+							onclick={() => setQuickAmount(2)}
+						>
+							2×
+						</button>
+					</div>
+
+					<!-- Calculated totals display -->
+					<div class="rounded-xl bg-muted/30 p-4">
+						<div class="flex items-center justify-between mb-3">
+							<span class="text-sm font-medium text-muted-foreground">Your total</span>
+							<span class="text-xs text-muted-foreground">
+								{servings.toFixed(1)} serving{servings !== 1 ? 's' : ''}
+							</span>
+						</div>
+						<div class="flex items-baseline gap-1">
+							<span class="text-3xl font-bold tabular-nums">{calories}</span>
+							<span class="text-sm font-medium text-muted-foreground">kcal</span>
+						</div>
+						<div class="mt-3 flex items-center gap-4 text-sm">
+							<span class="text-blue-500 dark:text-blue-400 font-medium">{protein}g P</span>
+							<span class="text-muted-foreground/40">•</span>
+							<span class="text-amber-500 dark:text-amber-400 font-medium">{carbs}g C</span>
+							<span class="text-muted-foreground/40">•</span>
+							<span class="text-rose-500 dark:text-rose-400 font-medium">{fat}g F</span>
+						</div>
+					</div>
 				</div>
-				<div class="space-y-2">
-					<Label for="carbs" class="text-xs text-muted-foreground">Carbs</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
-							id="carbs"
-							type="number"
-							inputmode="numeric"
-							placeholder="0"
-							bind:value={carbs}
-							class="text-center"
-						/>
-						<InputGroup.Addon>
-							<InputGroup.Text class="px-2">g</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+			{:else}
+				<!-- Food Photo / Manual Entry Mode -->
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="calories">Calories</Label>
+						<InputGroup.Root>
+							<InputGroup.Input
+								id="calories"
+								type="number"
+								inputmode="numeric"
+								placeholder="0"
+								value={baseCalories || ''}
+								oninput={(e) => handleManualCaloriesInput(e.currentTarget.value)}
+							/>
+							<InputGroup.Addon>
+								<InputGroup.Text>kcal</InputGroup.Text>
+							</InputGroup.Addon>
+						</InputGroup.Root>
+					</div>
+
+					<div class="space-y-2">
+						<Label for="servings">Servings</Label>
+						<InputGroup.Root>
+							<InputGroup.Input
+								id="servings"
+								type="number"
+								inputmode="decimal"
+								step="0.5"
+								min="0"
+								placeholder="1"
+								bind:value={amountEaten}
+							/>
+						</InputGroup.Root>
+					</div>
 				</div>
-				<div class="space-y-2">
-					<Label for="fat" class="text-xs text-muted-foreground">Fat</Label>
-					<InputGroup.Root>
-						<InputGroup.Input
-							id="fat"
-							type="number"
-							inputmode="numeric"
-							placeholder="0"
-							bind:value={fat}
-							class="text-center"
-						/>
-						<InputGroup.Addon>
-							<InputGroup.Text class="px-2">g</InputGroup.Text>
-						</InputGroup.Addon>
-					</InputGroup.Root>
+
+				<!-- Macros -->
+				<div class="grid grid-cols-3 gap-3">
+					<div class="space-y-2">
+						<Label for="protein" class="text-xs text-muted-foreground">Protein</Label>
+						<InputGroup.Root>
+							<InputGroup.Input
+								id="protein"
+								type="number"
+								inputmode="numeric"
+								placeholder="0"
+								value={baseProtein || ''}
+								oninput={(e) => handleManualProteinInput(e.currentTarget.value)}
+								class="text-center"
+							/>
+							<InputGroup.Addon>
+								<InputGroup.Text class="px-2">g</InputGroup.Text>
+							</InputGroup.Addon>
+						</InputGroup.Root>
+					</div>
+					<div class="space-y-2">
+						<Label for="carbs" class="text-xs text-muted-foreground">Carbs</Label>
+						<InputGroup.Root>
+							<InputGroup.Input
+								id="carbs"
+								type="number"
+								inputmode="numeric"
+								placeholder="0"
+								value={baseCarbs || ''}
+								oninput={(e) => handleManualCarbsInput(e.currentTarget.value)}
+								class="text-center"
+							/>
+							<InputGroup.Addon>
+								<InputGroup.Text class="px-2">g</InputGroup.Text>
+							</InputGroup.Addon>
+						</InputGroup.Root>
+					</div>
+					<div class="space-y-2">
+						<Label for="fat" class="text-xs text-muted-foreground">Fat</Label>
+						<InputGroup.Root>
+							<InputGroup.Input
+								id="fat"
+								type="number"
+								inputmode="numeric"
+								placeholder="0"
+								value={baseFat || ''}
+								oninput={(e) => handleManualFatInput(e.currentTarget.value)}
+								class="text-center"
+							/>
+							<InputGroup.Addon>
+								<InputGroup.Text class="px-2">g</InputGroup.Text>
+							</InputGroup.Addon>
+						</InputGroup.Root>
+					</div>
 				</div>
-			</div>
+
+				<!-- Show calculated totals when servings > 1 in manual mode -->
+				{#if parseFloat(amountEaten) > 1 && baseCalories > 0}
+					<div class="rounded-xl bg-muted/30 p-4">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm font-medium text-muted-foreground"
+								>Total for {amountEaten} servings</span
+							>
+						</div>
+						<div class="flex items-baseline gap-1">
+							<span class="text-2xl font-bold tabular-nums">{calories}</span>
+							<span class="text-sm font-medium text-muted-foreground">kcal</span>
+						</div>
+						{#if protein > 0 || carbs > 0 || fat > 0}
+							<div class="mt-2 flex items-center gap-3 text-sm">
+								{#if protein > 0}
+									<span class="text-blue-500 dark:text-blue-400 font-medium">{protein}g P</span>
+								{/if}
+								{#if carbs > 0}
+									<span class="text-amber-500 dark:text-amber-400 font-medium">{carbs}g C</span>
+								{/if}
+								{#if fat > 0}
+									<span class="text-rose-500 dark:text-rose-400 font-medium">{fat}g F</span>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/if}
+			{/if}
 		</div>
 
 		<!-- Submit Button -->
 		<Button
 			onclick={handleSubmit}
-			disabled={!name || !calories || analyzing}
+			disabled={!name || calories <= 0 || analyzing}
 			class="w-full text-base font-bold"
 		>
 			{#if analyzing}

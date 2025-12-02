@@ -51,11 +51,11 @@ export const analyzeMealImage = command(
 				protein: analysis.protein,
 				carbs: analysis.carbs,
 				fat: analysis.fat,
-				sodium: analysis.sodium,
-				cholesterol: analysis.cholesterol,
-				fiber: analysis.fiber,
-				sugar: analysis.sugar,
-				imageKey
+				imageKey,
+				isNutritionLabel: analysis.isNutritionLabel,
+				servingSize: analysis.servingSize,
+				servingQuantity: analysis.servingQuantity,
+				servingUnit: analysis.servingUnit
 			};
 		} catch (err) {
 			console.error('Meal analysis failed:', err);

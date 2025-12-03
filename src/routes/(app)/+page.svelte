@@ -9,10 +9,10 @@
 		DatePickerDialog,
 		EditMealDialog,
 		FoodAssistantDialog,
-		SettingsDialog,
-		WeightLogDialog
+		SettingsDialog
 	} from '$lib/components/dialog';
 	import { WaterTracker } from '$lib/components/water-tracker';
+	import { WeightTracker } from '$lib/components/weight-tracker';
 	import { Button } from '$lib/components/ui/button';
 	import {
 		DropdownMenu,
@@ -23,7 +23,7 @@
 	import { addMeal, deleteMeal, getMeals, updateMeal } from '$lib/remote/meals.remote';
 	import { getProfile } from '$lib/remote/profile.remote';
 	import { getWaterForDate } from '$lib/remote/water.remote';
-	import { getLatestWeight, getWeightForDate, logWeight } from '$lib/remote/weight.remote';
+	import { getLatestWeight } from '$lib/remote/weight.remote';
 	import { assistantOpen, settingsOpen } from '$lib/stores/ui.store';
 	import { formatDate, formatTime, getDisplayDate } from '$lib/utils/format';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -31,7 +31,6 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import UtensilsIcon from '@lucide/svelte/icons/utensils';
 	import { toast } from 'svelte-sonner';
@@ -60,7 +59,6 @@
 	let isAddModalOpen = $state(false);
 	let isEditModalOpen = $state(false);
 	let isDatePickerOpen = $state(false);
-	let isWeightModalOpen = $state(false);
 
 	let wasDatePickerOpen = $state(false);
 	$effect(() => {
@@ -89,7 +87,6 @@
 	const latestWeight = $derived(getLatestWeight().current ?? initialLatestWeight);
 
 	const selectedDateStr = $derived(formatDate(selectedDate));
-	const weightForSelectedDate = $derived(getWeightForDate(selectedDateStr).current);
 
 	let currentDayMeals = $derived.by(() => {
 		const dateStr = formatDate(selectedDate);
@@ -99,14 +96,7 @@
 	let calorieGoal = $derived(profile?.calorieGoal ?? 2000);
 	let weightGoal = $derived(profile?.weightGoal ?? null);
 	let units = $derived(profile?.units ?? 'imperial');
-	let weightUnit = $derived(units === 'metric' ? 'kg' : 'lbs');
 	let currentWeight = $derived(latestWeight?.weight ?? null);
-	let weightAtGoal = $derived(
-		weightGoal !== null && currentWeight !== null && currentWeight <= weightGoal
-	);
-	let weightToGo = $derived(
-		weightGoal !== null && currentWeight !== null ? currentWeight - weightGoal : 0
-	);
 
 	let history = $derived.by(() => {
 		const historyMap = new SvelteMap<string, number>();
@@ -217,19 +207,6 @@
 			toast.error('Failed to delete meal');
 		}
 	}
-
-	async function handleLogWeight(weight: number) {
-		try {
-			const dateStr = formatDate(selectedDate);
-			await logWeight({ weight, date: dateStr }).updates(
-				getLatestWeight(),
-				getWeightForDate(dateStr)
-			);
-		} catch (err) {
-			console.error('Failed to log weight:', err);
-			toast.error('Failed to log weight');
-		}
-	}
 </script>
 
 <svelte:head>
@@ -314,55 +291,7 @@
 				</div>
 
 				<!-- Weight Tracker -->
-				<button
-					class="shrink-0 flex items-center gap-3 rounded-xl bg-muted/30 p-3 text-left transition-colors hover:bg-muted/50"
-					onclick={() => (isWeightModalOpen = true)}
-				>
-					<div class="relative size-12 shrink-0">
-						<svg class="size-full -rotate-90" viewBox="0 0 40 40">
-							<circle cx="20" cy="20" r="16" fill="none" class="stroke-muted" stroke-width="3" />
-							{#if weightAtGoal}
-								<circle
-									cx="20"
-									cy="20"
-									r="16"
-									fill="none"
-									class="stroke-emerald-500 transition-all duration-300"
-									stroke-width="3"
-									stroke-linecap="round"
-									stroke-dasharray={2 * Math.PI * 16}
-									stroke-dashoffset={0}
-								/>
-							{/if}
-						</svg>
-						<ScaleIcon
-							class="absolute inset-0 m-auto size-5 {weightAtGoal
-								? 'text-emerald-500'
-								: 'text-muted-foreground'}"
-						/>
-					</div>
-					<div class="flex-1 min-w-0">
-						<div class="flex items-baseline gap-1">
-							<span class="text-lg font-bold tabular-nums">
-								{weightForSelectedDate?.weight ?? currentWeight ?? '—'}
-							</span>
-							<span class="text-xs text-muted-foreground">
-								{#if weightGoal}/ {weightGoal} {weightUnit}{:else}{weightUnit}{/if}
-							</span>
-						</div>
-						<span class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-							{#if weightForSelectedDate?.weight}
-								Weight logged
-							{:else if !currentWeight}
-								Tap to log weight
-							{:else if weightAtGoal}
-								Goal reached!
-							{:else}
-								{weightToGo.toFixed(1)} {weightUnit} to go
-							{/if}
-						</span>
-					</div>
-				</button>
+				<WeightTracker date={selectedDateStr} />
 
 				<!-- Water Tracker -->
 				<WaterTracker date={selectedDateStr} />
@@ -516,13 +445,6 @@
 	<AddMealDialog bind:open={isAddModalOpen} onAdd={handleAddMeal} />
 	<EditMealDialog bind:open={isEditModalOpen} meal={editingMeal} onSave={handleUpdateMeal} />
 	<DatePickerDialog bind:open={isDatePickerOpen} date={selectedDate} {history} />
-	<WeightLogDialog
-		bind:open={isWeightModalOpen}
-		onSave={handleLogWeight}
-		currentWeight={weightForSelectedDate?.weight ?? latestWeight?.weight ?? 0}
-		unit={weightUnit}
-		date={selectedDate}
-	/>
 	<SettingsDialog
 		bind:open={$settingsOpen}
 		currentCalorieGoal={calorieGoal}

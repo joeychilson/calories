@@ -33,7 +33,7 @@
 
 <svelte:head>
 	<title>Get Lifetime Access - Calories</title>
-	<meta name="description" content="Get lifetime access to Calories for just $10" />
+	<meta name="description" content="Get lifetime access to Calories for just $50" />
 </svelte:head>
 
 <div class="flex h-full flex-col bg-background">
@@ -57,7 +57,7 @@
 				<div class="mb-2 space-y-1 text-center">
 					<h2 class="text-lg font-bold">Lifetime Access</h2>
 					<div class="flex items-baseline justify-center gap-1">
-						<span class="text-4xl font-bold">$10</span>
+						<span class="text-4xl font-bold">$50</span>
 						<span class="text-muted-foreground">one-time</span>
 					</div>
 					<p class="text-xs text-muted-foreground">No subscriptions. Pay once, use forever.</p>

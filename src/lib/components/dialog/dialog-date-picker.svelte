@@ -55,15 +55,15 @@
 	bind:open
 	title="Select Date"
 	subtitle="View past meals and progress."
-	contentClass="w-auto max-w-sm p-0 overflow-hidden rounded-[1.5rem]"
-	headerClass="px-6 pt-6"
+	contentClass="sm:max-w-sm"
+	headerClass="px-4"
 >
-	<div class="p-4 flex justify-center bg-background">
+	<div class="w-full flex justify-center">
 		<Calendar
 			type="single"
 			bind:value
 			onValueChange={handleValueChange}
-			class="shadow-none border-0 w-full p-3"
+			class="shadow-none border-0 p-3"
 			fixedWeeks
 		>
 			{#snippet day({ day, outsideMonth })}

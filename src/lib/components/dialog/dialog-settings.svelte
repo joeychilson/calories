@@ -7,73 +7,45 @@
 		InputGroupText
 	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
-	import { optimizeCalories, updateSettings } from '$lib/remote/settings.remote';
+	import { updateProfile } from '$lib/remote/profile.remote';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import { toast } from 'svelte-sonner';
 	import ResponsiveDialog from './dialog-responsive.svelte';
 
 	let {
 		open = $bindable(false),
 		currentCalorieGoal = 2200,
+		currentWaterGoal = 64,
 		currentWeightGoal = null as number | null,
 		currentWeight = null as number | null,
-		weightUnit = 'lbs',
+		units = 'imperial',
 		onSave
 	}: {
 		open?: boolean;
 		currentCalorieGoal?: number;
+		currentWaterGoal?: number;
 		currentWeightGoal?: number | null;
 		currentWeight?: number | null;
-		weightUnit?: string;
+		units?: string;
 		onSave?: () => void;
 	} = $props();
 
 	let calorieGoal = $state('');
+	let waterGoal = $state('');
 	let weightGoal = $state('');
 	let saving = $state(false);
-	let optimizing = $state(false);
-	let aiResult = $state<{ calories: number; timeline: string; explanation: string } | null>(null);
+
+	let weightUnit = $derived(units === 'imperial' ? 'lbs' : 'kg');
+	let waterUnit = $derived(units === 'imperial' ? 'oz' : 'ml');
 
 	$effect(() => {
 		if (open) {
 			calorieGoal = String(currentCalorieGoal);
+			waterGoal = String(currentWaterGoal);
 			weightGoal = currentWeightGoal ? String(currentWeightGoal) : '';
-			aiResult = null;
 		}
 	});
-
-	async function handleOptimize() {
-		if (!currentWeight) {
-			toast.error('Please log your current weight first');
-			return;
-		}
-
-		if (!weightGoal) {
-			toast.error('Please enter a goal weight');
-			return;
-		}
-
-		optimizing = true;
-		aiResult = null;
-
-		try {
-			const result = await optimizeCalories({
-				currentWeight,
-				goalWeight: parseFloat(weightGoal),
-				unit: weightUnit
-			});
-
-			aiResult = result;
-			calorieGoal = String(result.calories);
-		} catch (err) {
-			console.error('Optimization failed:', err);
-			toast.error('Failed to get AI recommendation');
-		} finally {
-			optimizing = false;
-		}
-	}
 
 	async function handleSave() {
 		if (!calorieGoal) return;
@@ -81,9 +53,10 @@
 		saving = true;
 
 		try {
-			await updateSettings({
+			await updateProfile({
 				calorieGoal: parseInt(calorieGoal),
-				weightGoal: weightGoal ? parseFloat(weightGoal) : undefined
+				waterGoal: parseInt(waterGoal),
+				...(weightGoal && { weightGoal: parseFloat(weightGoal) })
 			});
 			onSave?.();
 			open = false;
@@ -99,17 +72,17 @@
 <ResponsiveDialog
 	bind:open
 	title="Goals & Settings"
-	subtitle="Set your daily calorie target"
+	subtitle="Set your daily targets"
 	contentClass="sm:max-w-md"
 >
-	<div class="py-4 space-y-6">
+	<div class="space-y-6 py-4">
 		{#if currentWeight}
-			<div class="bg-muted/30 border border-muted rounded-lg p-3 flex items-center gap-3">
-				<div class="bg-background p-2 rounded-md shadow-sm">
+			<div class="flex items-center gap-3 rounded-lg border border-muted bg-muted/30 p-3">
+				<div class="rounded-md bg-background p-2 shadow-sm">
 					<ScaleIcon class="size-4 text-muted-foreground" />
 				</div>
 				<div>
-					<p class="text-xs text-muted-foreground font-medium">Current Weight</p>
+					<p class="text-xs font-medium text-muted-foreground">Current Weight</p>
 					<p class="text-sm font-bold">{currentWeight} {weightUnit}</p>
 				</div>
 			</div>
@@ -131,38 +104,6 @@
 			</InputGroup>
 		</div>
 
-		{#if currentWeight && weightGoal}
-			<Button variant="outline" class="w-full" onclick={handleOptimize} disabled={optimizing}>
-				{#if optimizing}
-					<Loader2Icon class="mr-2 size-4 animate-spin" />
-					Calculating...
-				{:else}
-					<SparklesIcon class="mr-2 size-4 text-primary" />
-					Calculate with AI
-				{/if}
-			</Button>
-		{/if}
-
-		{#if aiResult}
-			<div class="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
-				<div class="flex items-center gap-2">
-					<SparklesIcon class="size-3 text-primary" />
-					<span class="text-xs font-bold text-primary">AI Recommendation</span>
-				</div>
-				<div class="space-y-1">
-					<div class="flex justify-between items-baseline">
-						<span class="text-xs text-muted-foreground">Daily Calories</span>
-						<span class="text-lg font-bold">{aiResult.calories}</span>
-					</div>
-					<div class="flex justify-between items-baseline">
-						<span class="text-xs text-muted-foreground">Timeline</span>
-						<span class="text-sm font-medium text-emerald-600">{aiResult.timeline}</span>
-					</div>
-				</div>
-				<p class="text-xs text-muted-foreground leading-relaxed">{aiResult.explanation}</p>
-			</div>
-		{/if}
-
 		<div class="space-y-2">
 			<Label for="calorieGoal">Daily Calorie Goal</Label>
 			<InputGroup>
@@ -176,11 +117,16 @@
 					<InputGroupText>kcal</InputGroupText>
 				</InputGroupAddon>
 			</InputGroup>
-			{#if !aiResult}
-				<p class="text-xs text-muted-foreground">
-					Or enter your goal weight above and let AI calculate the optimal calories.
-				</p>
-			{/if}
+		</div>
+
+		<div class="space-y-2">
+			<Label for="waterGoal">Daily Water Goal</Label>
+			<InputGroup>
+				<InputGroupInput id="waterGoal" type="number" placeholder="64" bind:value={waterGoal} />
+				<InputGroupAddon>
+					<InputGroupText>{waterUnit}</InputGroupText>
+				</InputGroupAddon>
+			</InputGroup>
 		</div>
 
 		<Button onclick={handleSave} disabled={!calorieGoal || saving} class="w-full">

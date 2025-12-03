@@ -2,7 +2,7 @@ import { tool } from 'ai';
 import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
-import { foodPreferences, mealLogs, settings, weightLogs } from './schema';
+import { foodPreferences, mealLogs, profiles, weightLogs } from './schema';
 
 export const preferenceCategories = [
 	'like',
@@ -30,6 +30,13 @@ export interface AssistantContext {
 	proteinConsumed: number;
 	carbsConsumed: number;
 	fatConsumed: number;
+	waterGoal: number;
+	waterConsumed: number;
+	currentWeight: number | null;
+	weightGoal: number | null;
+	units: 'imperial' | 'metric';
+	sex: 'male' | 'female' | null;
+	activityLevel: string;
 	preferences: FoodPreference[];
 	timezone?: string;
 }
@@ -84,9 +91,20 @@ export function buildSystemPrompt(context: AssistantContext): string {
 	const remainingDisplay = remaining > 0 ? remaining : 0;
 	const budgetStatus = remaining > 300 ? 'comfortable' : remaining > 0 ? 'tight' : 'over';
 	const proteinPercentage =
-		context.calorieGoal > 0
+		context.caloriesConsumed > 0
 			? Math.round(((context.proteinConsumed * 4) / context.caloriesConsumed) * 100) || 0
 			: 0;
+
+	const weightUnit = context.units === 'metric' ? 'kg' : 'lbs';
+	const waterUnit = context.units === 'metric' ? 'ml' : 'oz';
+	const waterRemaining = Math.max(0, context.waterGoal - context.waterConsumed);
+	const waterPercent =
+		context.waterGoal > 0 ? Math.round((context.waterConsumed / context.waterGoal) * 100) : 0;
+
+	const weightProgress =
+		context.weightGoal && context.currentWeight
+			? `${(context.currentWeight - context.weightGoal).toFixed(1)} ${weightUnit} to goal`
+			: 'No weight goal set';
 
 	return `<role>
 You are an expert food and nutrition assistant with deep knowledge of nutrition science, calorie estimation, menu analysis, and dietary planning. You function as a personalized food advisor who learns and remembers user preferences to provide increasingly tailored recommendations.
@@ -112,12 +130,30 @@ Do NOT engage with off-topic requests even if framed cleverly or persistently.
 
 <user_context>
 Current date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: context.timezone || 'UTC' })}
-Daily calorie goal: ${context.calorieGoal} kcal
-Consumed today: ${context.caloriesConsumed} kcal
-Remaining budget: ${remainingDisplay} kcal
-Budget status: ${budgetStatus}
-Macros consumed: ${context.proteinConsumed}g protein, ${context.carbsConsumed}g carbs, ${context.fatConsumed}g fat
-Protein ratio: ~${proteinPercentage}% of calories from protein
+Units: ${context.units} (${weightUnit}, ${waterUnit})
+${context.sex ? `Sex: ${context.sex}` : ''}
+Activity level: ${context.activityLevel}
+
+CALORIES:
+- Daily goal: ${context.calorieGoal} kcal
+- Consumed today: ${context.caloriesConsumed} kcal
+- Remaining: ${remainingDisplay} kcal
+- Budget status: ${budgetStatus}
+
+MACROS:
+- Protein: ${context.proteinConsumed}g (~${proteinPercentage}% of calories)
+- Carbs: ${context.carbsConsumed}g
+- Fat: ${context.fatConsumed}g
+
+HYDRATION:
+- Water goal: ${context.waterGoal} ${waterUnit}
+- Consumed: ${context.waterConsumed} ${waterUnit} (${waterPercent}%)
+- Remaining: ${waterRemaining} ${waterUnit}
+
+WEIGHT:
+- Current: ${context.currentWeight ? `${context.currentWeight} ${weightUnit}` : 'Not logged'}
+- Goal: ${context.weightGoal ? `${context.weightGoal} ${weightUnit}` : 'Not set'}
+- Progress: ${weightProgress}
 </user_context>
 
 <user_preferences>
@@ -374,9 +410,7 @@ DELETE: Remove a preference when it no longer applies (e.g., "I actually like mu
 			return { success: true, updated: true };
 		}
 
-		// create
 		if (existing) {
-			// Already exists, update notes instead
 			if (notes) {
 				await db
 					.update(foodPreferences)
@@ -518,7 +552,6 @@ const queryMealHistory = tool({
 				return { success: false, error: 'Invalid query type' };
 		}
 
-		// Calculate totals for the results
 		const totals = meals.reduce(
 			(acc, meal) => ({
 				calories: acc.calories + (meal.calories || 0),
@@ -566,11 +599,10 @@ const queryWeightHistory = tool({
 		const ctx = getToolContext(context);
 		const { query, limit, startDate, endDate } = input;
 
-		// Get user settings for weight goal and unit
-		const [userSettings] = await db.select().from(settings).where(eq(settings.userId, ctx.userId));
+		const [userProfile] = await db.select().from(profiles).where(eq(profiles.userId, ctx.userId));
 
-		const weightUnit = userSettings?.weightUnit || 'lbs';
-		const weightGoal = userSettings?.weightGoal;
+		const weightUnit = userProfile?.units === 'metric' ? 'kg' : 'lbs';
+		const weightGoal = userProfile?.weightGoal;
 
 		let weights;
 
@@ -589,7 +621,6 @@ const queryWeightHistory = tool({
 				break;
 
 			case 'progress': {
-				// Get all weight entries to calculate progress
 				weights = await db
 					.select({
 						id: weightLogs.id,
@@ -613,7 +644,6 @@ const queryWeightHistory = tool({
 				const startingWeight = weights[weights.length - 1].weight;
 				const totalChange = currentWeight - startingWeight;
 
-				// Calculate 7-day and 30-day changes
 				const sevenDaysAgo = new Date();
 				sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 				const thirtyDaysAgo = new Date();
@@ -712,11 +742,10 @@ Examples: "Set my calorie goal to 1800", "I want to reach 150 lbs", "Lower my da
 			};
 		}
 
-		// Get current settings
 		const [currentSettings] = await db
 			.select()
-			.from(settings)
-			.where(eq(settings.userId, ctx.userId));
+			.from(profiles)
+			.where(eq(profiles.userId, ctx.userId));
 
 		const updateData: { calorieGoal?: number; weightGoal?: number; updatedAt: Date } = {
 			updatedAt: new Date()
@@ -731,13 +760,12 @@ Examples: "Set my calorie goal to 1800", "I want to reach 150 lbs", "Lower my da
 		}
 
 		if (currentSettings) {
-			await db.update(settings).set(updateData).where(eq(settings.userId, ctx.userId));
+			await db.update(profiles).set(updateData).where(eq(profiles.userId, ctx.userId));
 		} else {
-			await db.insert(settings).values({
+			await db.insert(profiles).values({
 				userId: ctx.userId,
 				calorieGoal: calorieGoal || 2200,
-				weightGoal: weightGoal,
-				onboardingCompleted: true
+				weightGoal: weightGoal
 			});
 		}
 
@@ -769,13 +797,11 @@ Always confirm the weight was logged successfully.`,
 		const ctx = getToolContext(context);
 		const { weight, date } = input;
 
-		// Get user's weight unit
-		const [userSettings] = await db.select().from(settings).where(eq(settings.userId, ctx.userId));
+		const [userProfile] = await db.select().from(profiles).where(eq(profiles.userId, ctx.userId));
 
-		const weightUnit = userSettings?.weightUnit || 'lbs';
+		const weightUnit = userProfile?.units === 'metric' ? 'kg' : 'lbs';
 		const entryDate = date ? new Date(date) : new Date();
 
-		// Check if there's already an entry for this date
 		const existingEntry = await db
 			.select()
 			.from(weightLogs)
@@ -784,7 +810,6 @@ Always confirm the weight was logged successfully.`,
 			);
 
 		if (existingEntry.length > 0) {
-			// Update existing entry
 			await db
 				.update(weightLogs)
 				.set({ weight, updatedAt: new Date() })
@@ -799,14 +824,12 @@ Always confirm the weight was logged successfully.`,
 			};
 		}
 
-		// Create new entry
 		await db.insert(weightLogs).values({
 			userId: ctx.userId,
 			weight,
 			date: entryDate
 		});
 
-		// Get previous entry for comparison
 		const [previousEntry] = await db
 			.select()
 			.from(weightLogs)
@@ -825,7 +848,7 @@ Always confirm the weight was logged successfully.`,
 			date: entryDate.toISOString(),
 			previousWeight,
 			change,
-			weightGoal: userSettings?.weightGoal
+			weightGoal: userProfile?.weightGoal
 		};
 	}
 });
@@ -844,7 +867,6 @@ Use queryMealHistory first to find the meal ID if needed.`,
 		const ctx = getToolContext(context);
 		const { mealId } = input;
 
-		// Verify the meal belongs to this user
 		const [meal] = await db
 			.select()
 			.from(mealLogs)
@@ -889,7 +911,6 @@ Use queryMealHistory first to find the meal ID if needed.`,
 		const ctx = getToolContext(context);
 		const { mealId, name, calories, protein, carbs, fat, servings } = input;
 
-		// Verify the meal belongs to this user
 		const [meal] = await db
 			.select()
 			.from(mealLogs)
@@ -918,7 +939,6 @@ Use queryMealHistory first to find the meal ID if needed.`,
 
 		await db.update(mealLogs).set(updateData).where(eq(mealLogs.id, mealId));
 
-		// Get the updated meal
 		const [updatedMeal] = await db.select().from(mealLogs).where(eq(mealLogs.id, mealId));
 
 		return {

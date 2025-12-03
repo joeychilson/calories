@@ -20,7 +20,7 @@
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 	import { addMeal, deleteMeal, getMeals, updateMeal } from '$lib/remote/meals.remote';
-	import { getSettings } from '$lib/remote/settings.remote';
+	import { getProfile } from '$lib/remote/profile.remote';
 	import { getWaterForDate, updateWater } from '$lib/remote/water.remote';
 	import { getLatestWeight, getWeightForDate, logWeight } from '$lib/remote/weight.remote';
 	import { assistantOpen, settingsOpen } from '$lib/stores/ui.store';
@@ -81,11 +81,11 @@
 	} | null>(null);
 
 	const initialMeals = await getMeals();
-	const initialSettings = await getSettings();
+	const initialProfile = await getProfile();
 	const initialLatestWeight = await getLatestWeight();
 
 	const meals = $derived(getMeals().current ?? initialMeals);
-	const settings = $derived(getSettings().current ?? initialSettings);
+	const profile = $derived(getProfile().current ?? initialProfile);
 	const latestWeight = $derived(getLatestWeight().current ?? initialLatestWeight);
 
 	const selectedDateStr = $derived(formatDate(selectedDate));
@@ -96,9 +96,10 @@
 		return meals.filter((m) => m.date === dateStr).sort((a, b) => b.timestamp - a.timestamp);
 	});
 
-	let calorieGoal = $derived(settings?.calorieGoal ?? 2200);
-	let weightGoal = $derived(settings?.weightGoal ?? null);
-	let weightUnit = $derived(settings?.weightUnit ?? 'lbs');
+	let calorieGoal = $derived(profile?.calorieGoal ?? 2000);
+	let weightGoal = $derived(profile?.weightGoal ?? null);
+	let units = $derived(profile?.units ?? 'imperial');
+	let weightUnit = $derived(units === 'metric' ? 'kg' : 'lbs');
 	let currentWeight = $derived(latestWeight?.weight ?? null);
 	let weightAtGoal = $derived(
 		weightGoal !== null && currentWeight !== null && currentWeight <= weightGoal
@@ -126,27 +127,30 @@
 	let totalProtein = $derived(currentDayMeals.reduce((acc, m) => acc + (m.protein || 0), 0));
 	let totalCarbs = $derived(currentDayMeals.reduce((acc, m) => acc + (m.carbs || 0), 0));
 	let totalFat = $derived(currentDayMeals.reduce((acc, m) => acc + (m.fat || 0), 0));
+	let useOz = $derived(units === 'imperial');
+	let waterUnit = $derived(useOz ? 'oz' : 'ml');
+	let waterSmallAmount = $derived(useOz ? 8 : 250);
+	let waterLargeAmount = $derived(useOz ? 16 : 500);
+	let waterGoal = $derived(profile?.waterGoal ?? (useOz ? 64 : 2000));
+
+	const waterForSelectedDate = $derived(getWaterForDate(selectedDateStr).current);
+	let waterConsumed = $derived(waterForSelectedDate?.amount ?? 0);
+	let waterPercent = $derived(Math.min((waterConsumed / waterGoal) * 100, 100));
 
 	let assistantContext = $derived({
 		calorieGoal,
 		caloriesConsumed: totalCalories,
 		proteinConsumed: totalProtein,
 		carbsConsumed: totalCarbs,
-		fatConsumed: totalFat
+		fatConsumed: totalFat,
+		waterGoal,
+		waterConsumed,
+		currentWeight,
+		weightGoal: profile?.weightGoal ?? null,
+		units,
+		sex: profile?.sex ?? null,
+		activityLevel: profile?.activityLevel ?? 'moderate'
 	});
-
-	// Water tracking
-	let useOz = $derived(weightUnit === 'lbs');
-	let waterUnit = $derived(useOz ? 'oz' : 'ml');
-
-	// Amounts for buttons based on unit
-	let waterSmallAmount = $derived(useOz ? 8 : 250);
-	let waterLargeAmount = $derived(useOz ? 16 : 500);
-	let waterGoalDisplay = $derived(useOz ? 64 : 2000);
-
-	const waterForSelectedDate = $derived(getWaterForDate(selectedDateStr).current);
-	let waterConsumed = $derived(waterForSelectedDate?.amount ?? 0);
-	let waterPercent = $derived(Math.min((waterConsumed / waterGoalDisplay) * 100, 100));
 
 	async function addWater(amount: number) {
 		try {
@@ -400,7 +404,7 @@
 					<div class="flex-1 min-w-0">
 						<div class="flex items-baseline gap-1">
 							<span class="text-lg font-bold tabular-nums">{waterConsumed}</span>
-							<span class="text-xs text-muted-foreground">/ {waterGoalDisplay}{waterUnit}</span>
+							<span class="text-xs text-muted-foreground">/ {waterGoal}{waterUnit}</span>
 						</div>
 						<span class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
 							Water intake
@@ -594,10 +598,11 @@
 	<SettingsDialog
 		bind:open={$settingsOpen}
 		currentCalorieGoal={calorieGoal}
-		currentWeightGoal={weightGoal}
+		currentWaterGoal={waterGoal}
+		currentWeightGoal={profile?.weightGoal ?? null}
 		{currentWeight}
-		{weightUnit}
-		onSave={() => getSettings().refresh()}
+		{units}
+		onSave={() => getProfile().refresh()}
 	/>
 	<FoodAssistantDialog
 		bind:open={$assistantOpen}

@@ -3,7 +3,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 
 import { isHostedMode } from '$lib/server/access';
 import { db } from '$lib/server/db';
-import { settings } from '$lib/server/schema';
+import { subscriptions } from '$lib/server/schema';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import Stripe from 'stripe';
@@ -56,7 +56,7 @@ export const auth = betterAuth({
 					const hasPaid = payments.data.some((p) => p.status === 'succeeded');
 
 					if (hasPaid) {
-						await db.insert(settings).values({
+						await db.insert(subscriptions).values({
 							userId: user.id,
 							paid: true,
 							paidAt: new Date(),

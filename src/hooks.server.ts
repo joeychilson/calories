@@ -2,7 +2,7 @@ import { building } from '$app/environment';
 import { hasAccess, isHostedMode } from '$lib/server/access';
 import { auth } from '$lib/server/auth';
 import { db } from '$lib/server/db';
-import { settings } from '$lib/server/schema';
+import { subscriptions } from '$lib/server/schema';
 import { type Handle, redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
@@ -32,11 +32,12 @@ const authRedirect: Handle = async ({ event, resolve }) => {
 		}
 
 		if (isHostedMode() && !isPublicRoute && !isWebhook) {
-			const userSettings = await db.query.settings.findFirst({
-				where: eq(settings.userId, session.user.id)
-			});
+			const [userSubscription] = await db
+				.select()
+				.from(subscriptions)
+				.where(eq(subscriptions.userId, session.user.id));
 
-			if (!hasAccess(userSettings?.paid ?? false)) {
+			if (!hasAccess(userSubscription?.paid ?? false)) {
 				return redirect(303, '/checkout');
 			}
 		}

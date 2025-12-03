@@ -87,8 +87,8 @@ export const verifications = pgTable(
 	(table) => [index('verifications_identifier_idx').on(table.identifier)]
 );
 
-export const settings = pgTable(
-	'settings',
+export const subscriptions = pgTable(
+	'subscriptions',
 	{
 		id: uuid('id').primaryKey().defaultRandom(),
 		userId: uuid('user_id')
@@ -96,9 +96,6 @@ export const settings = pgTable(
 			.unique()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		stripeCustomerId: text('stripe_customer_id'),
-		calorieGoal: integer('calorie_goal').default(2200).notNull(),
-		weightGoal: real('weight_goal'),
-		weightUnit: text('weight_unit').default('lbs').notNull(),
 		onboardingCompleted: boolean('onboarding_completed').default(false).notNull(),
 		paid: boolean('paid').default(false).notNull(),
 		paidAt: timestamp('paid_at'),
@@ -109,7 +106,33 @@ export const settings = pgTable(
 			.$defaultFn(() => new Date())
 			.notNull()
 	},
-	(table) => [index('settings_user_id_idx').on(table.userId)]
+	(table) => [index('subscriptions_user_id_idx').on(table.userId)]
+);
+
+export const profiles = pgTable(
+	'profiles',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: uuid('user_id')
+			.notNull()
+			.unique()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		sex: text('sex'),
+		birthDate: timestamp('birth_date'),
+		height: real('height'),
+		units: text('units').default('imperial').notNull(),
+		weightGoal: real('weight_goal'),
+		calorieGoal: integer('calorie_goal').default(2000).notNull(),
+		waterGoal: integer('water_goal').default(64).notNull(),
+		activityLevel: text('activity_level').default('moderate').notNull(),
+		createdAt: timestamp('created_at')
+			.$defaultFn(() => new Date())
+			.notNull(),
+		updatedAt: timestamp('updated_at')
+			.$defaultFn(() => new Date())
+			.notNull()
+	},
+	(table) => [index('profiles_user_id_idx').on(table.userId)]
 );
 
 export const mealLogs = pgTable(

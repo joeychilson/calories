@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
-import { settings } from '$lib/server/schema';
+import { subscriptions } from '$lib/server/schema';
 import { json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
@@ -34,13 +34,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		if (userId) {
 			await db
-				.update(settings)
+				.update(subscriptions)
 				.set({
 					paid: true,
 					paidAt: new Date(),
 					updatedAt: new Date()
 				})
-				.where(eq(settings.userId, userId));
+				.where(eq(subscriptions.userId, userId));
 
 			console.log(`Payment completed for user ${userId}`);
 		}

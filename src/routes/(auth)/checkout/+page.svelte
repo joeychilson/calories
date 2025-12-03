@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
-	import { createCheckoutSession } from '$lib/remote/checkout.remote';
+	import { createCheckoutSession } from '$lib/remote/subscriptions.remote';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import HamburgerIcon from '@lucide/svelte/icons/hamburger';
 	import { toast } from 'svelte-sonner';

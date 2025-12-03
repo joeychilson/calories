@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
-	import { getPaymentStatus } from '$lib/remote/checkout.remote';
+	import { getSubscription } from '$lib/remote/subscriptions.remote';
 	import CheckCircleIcon from '@lucide/svelte/icons/check-circle';
 	import HamburgerIcon from '@lucide/svelte/icons/hamburger';
 	import { onMount } from 'svelte';
@@ -11,12 +11,12 @@
 
 	async function checkPaymentStatus() {
 		for (let i = 0; i < 10; i++) {
-			const result = await getPaymentStatus();
+			const result = await getSubscription();
 			if (result.paid) {
 				status = 'success';
 				return;
 			}
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			await new Promise((r) => setTimeout(r, 1000));
 		}
 		status = 'pending';
 	}

@@ -4,15 +4,16 @@
 
 	import OnboardingDialog from '$lib/components/dialog/dialog-onboarding.svelte';
 	import { Header } from '$lib/components/header';
-	import { getSettings } from '$lib/remote/settings.remote';
+	import { getProfile } from '$lib/remote/profile.remote';
+	import { getSubscription } from '$lib/remote/subscriptions.remote';
 	import { getLatestWeight } from '$lib/remote/weight.remote';
 	import { assistantOpen, settingsOpen } from '$lib/stores/ui.store';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
-	const initialSettings = await getSettings();
+	const initialSubscription = await getSubscription();
 
-	let isOnboardingOpen = $state(!initialSettings.onboardingCompleted);
+	let isOnboardingOpen = $state(!initialSubscription.onboardingCompleted);
 </script>
 
 <div class="flex h-dvh flex-col">
@@ -29,7 +30,8 @@
 <OnboardingDialog
 	bind:open={isOnboardingOpen}
 	onComplete={() => {
-		getSettings().refresh();
+		getProfile().refresh();
+		getSubscription().refresh();
 		getLatestWeight().refresh();
 	}}
 />

@@ -63,7 +63,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			stream: createUIMessageStream<Message>({
 				execute: async ({ writer }) => {
 					const result = streamText({
-						model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
+						model: openrouter.chat('x-ai/grok-4-fast'),
 						providerOptions: {
 							openrouter: { provider: { sort: 'latency' }, reasoning: { enabled: true } }
 						},

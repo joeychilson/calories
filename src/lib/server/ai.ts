@@ -152,7 +152,7 @@ export async function analyzeMealFromImage(
 	mimeType: string
 ): Promise<MealAnalysis> {
 	const { object } = await generateObject({
-		model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
+		model: openrouter.chat('x-ai/grok-4-fast'),
 		providerOptions: {
 			openrouter: { provider: { sort: 'latency' }, reasoning: { enabled: true } }
 		},
@@ -247,7 +247,7 @@ WHEN UNCERTAIN: Estimate on the higher end. Users typically underreport.
 
 export async function analyzeMealFromText(description: string): Promise<MealAnalysis> {
 	const { object } = await generateObject({
-		model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
+		model: openrouter.chat('x-ai/grok-4-fast'),
 		providerOptions: {
 			openrouter: { provider: { sort: 'latency' }, reasoning: { effort: 'high' } }
 		},

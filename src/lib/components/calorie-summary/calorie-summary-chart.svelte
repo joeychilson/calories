@@ -102,6 +102,6 @@
 	<div class="absolute inset-0 flex flex-col items-center justify-center text-center">
 		<span class="text-sm font-medium text-muted-foreground">Remaining</span>
 		<span class="text-4xl font-bold tracking-tighter text-foreground">{remaining}</span>
-		<span class="text-xs text-muted-foreground font-medium mt-1">kcal</span>
+		<span class="text-xs font-medium text-muted-foreground mt-1">kcal</span>
 	</div>
 </div>

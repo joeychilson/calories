@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import CalorieRadialChart from '$lib/components/calorie-radial-chart.svelte';
+	import { CalorieSummary } from '$lib/components/calorie-summary';
 	import {
 		AddMealDialog,
 		DatePickerDialog,
@@ -245,50 +245,7 @@
 
 		<div class="flex min-h-0 flex-1 flex-col px-6">
 			<div class="flex min-h-0 flex-1 flex-col gap-4">
-				<div class="shrink-0">
-					<div class="flex flex-col items-center justify-center py-2">
-						<CalorieRadialChart
-							meals={currentDayMeals.map((m) => ({
-								id: m.id,
-								name: m.name,
-								calories: m.calories
-							}))}
-							goal={calorieGoal}
-							size={200}
-							thickness={16}
-						/>
-
-						<div class="mt-2 flex items-center gap-8">
-							<div class="flex flex-col items-center">
-								<span class="text-lg font-bold text-blue-500 dark:text-blue-400"
-									>{totalProtein}g</span
-								>
-								<span
-									class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60"
-									>Protein</span
-								>
-							</div>
-							<div class="h-8 w-px bg-border/50"></div>
-							<div class="flex flex-col items-center">
-								<span class="text-lg font-bold text-amber-500 dark:text-amber-400"
-									>{totalCarbs}g</span
-								>
-								<span
-									class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60"
-									>Carbs</span
-								>
-							</div>
-							<div class="h-8 w-px bg-border/50"></div>
-							<div class="flex flex-col items-center">
-								<span class="text-lg font-bold text-rose-500 dark:text-rose-400">{totalFat}g</span>
-								<span
-									class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60"
-									>Fat</span
-								>
-							</div>
-						</div>
-					</div>
-				</div>
+				<CalorieSummary date={selectedDateStr} />
 
 				<!-- Weight Tracker -->
 				<WeightTracker date={selectedDateStr} />

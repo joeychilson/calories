@@ -2,7 +2,6 @@
 	import { AddMealDialog, EditMealDialog } from '$lib/components/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { addMeal, deleteMeal, getMeals, updateMeal } from '$lib/remote/meals.remote';
-	import { formatDate } from '$lib/utils/format';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UtensilsIcon from '@lucide/svelte/icons/utensils';
 	import { toast } from 'svelte-sonner';

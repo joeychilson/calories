@@ -3,21 +3,19 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { CalorieSummary } from '$lib/components/calorie-summary';
-	import { DatePickerDialog, FoodAssistantDialog, SettingsDialog } from '$lib/components/dialog';
+	import { DayNavigation } from '$lib/components/day-navigation';
+	import { FoodAssistantDialog, SettingsDialog } from '$lib/components/dialog';
 	import { MealsList } from '$lib/components/meals-list';
 	import { WaterTracker } from '$lib/components/water-tracker';
 	import { WeightTracker } from '$lib/components/weight-tracker';
-	import { Button } from '$lib/components/ui/button';
 	import { addMeal, getMeals } from '$lib/remote/meals.remote';
 	import { getProfile } from '$lib/remote/profile.remote';
 	import { getWaterForDate } from '$lib/remote/water.remote';
 	import { getLatestWeight } from '$lib/remote/weight.remote';
 	import { assistantOpen, settingsOpen } from '$lib/stores/ui.store';
-	import { formatDate, getDisplayDate } from '$lib/utils/format';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import { formatDate } from '$lib/utils/format';
 	import { toast } from 'svelte-sonner';
-	import { SvelteDate, SvelteMap } from 'svelte/reactivity';
+	import { SvelteDate } from 'svelte/reactivity';
 
 	function parseDateParam(param: string | null): Date {
 		if (!param) return new Date();
@@ -38,16 +36,6 @@
 			goto(`/?d=${dateStr}`, { replaceState: true, keepFocus: true, noScroll: true });
 		}
 	}
-	let isDatePickerOpen = $state(false);
-
-	let wasDatePickerOpen = $state(false);
-	$effect(() => {
-		if (wasDatePickerOpen && !isDatePickerOpen) {
-			updateUrlDate(selectedDate);
-		}
-		wasDatePickerOpen = isDatePickerOpen;
-	});
-
 	const initialMeals = await getMeals();
 	const initialProfile = await getProfile();
 	const initialLatestWeight = await getLatestWeight();
@@ -64,24 +52,8 @@
 	});
 
 	let calorieGoal = $derived(profile?.calorieGoal ?? 2000);
-	let weightGoal = $derived(profile?.weightGoal ?? null);
 	let units = $derived(profile?.units ?? 'imperial');
 	let currentWeight = $derived(latestWeight?.weight ?? null);
-
-	let history = $derived.by(() => {
-		const historyMap = new SvelteMap<string, number>();
-		for (const m of meals) {
-			historyMap.set(m.date, (historyMap.get(m.date) || 0) + m.calories);
-		}
-
-		return Array.from(historyMap.entries()).map(([date, cals]) => ({
-			date,
-			status:
-				cals > calorieGoal
-					? 'over'
-					: ((cals > calorieGoal * 0.8 ? 'met' : 'under') as 'over' | 'met' | 'under')
-		}));
-	});
 
 	let totalCalories = $derived(currentDayMeals.reduce((acc, m) => acc + m.calories, 0));
 	let totalProtein = $derived(currentDayMeals.reduce((acc, m) => acc + (m.protein || 0), 0));
@@ -105,11 +77,6 @@
 		sex: profile?.sex ?? null,
 		activityLevel: profile?.activityLevel ?? 'moderate'
 	});
-
-	function handleDateChange(days: number) {
-		selectedDate.setDate(selectedDate.getDate() + days);
-		updateUrlDate(selectedDate);
-	}
 
 	type MealInput = {
 		name: string;
@@ -161,28 +128,7 @@
 
 <div class="flex h-full flex-col bg-background">
 	<div class="mx-auto flex h-full w-full max-w-md flex-col">
-		<header class="flex shrink-0 items-center justify-between px-4 py-2">
-			<Button variant="ghost" size="icon" class="rounded-full" onclick={() => handleDateChange(-1)}>
-				<ChevronLeftIcon class="size-5 text-muted-foreground" />
-			</Button>
-			<button class="flex flex-col items-center" onclick={() => (isDatePickerOpen = true)}>
-				<span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-					{selectedDate.getFullYear()}
-				</span>
-				<span class="text-lg font-bold text-foreground">
-					{getDisplayDate(selectedDate)}
-				</span>
-			</button>
-			<Button
-				variant="ghost"
-				size="icon"
-				class="rounded-full"
-				onclick={() => handleDateChange(1)}
-				disabled={formatDate(selectedDate) === formatDate(new Date())}
-			>
-				<ChevronRightIcon class="size-5 text-muted-foreground" />
-			</Button>
-		</header>
+		<DayNavigation date={selectedDate} onDateChange={() => updateUrlDate(selectedDate)} />
 
 		<div class="flex min-h-0 flex-1 flex-col px-6">
 			<div class="flex min-h-0 flex-1 flex-col gap-4">
@@ -199,7 +145,6 @@
 		</div>
 	</div>
 
-	<DatePickerDialog bind:open={isDatePickerOpen} date={selectedDate} {history} />
 	<SettingsDialog
 		bind:open={$settingsOpen}
 		currentCalorieGoal={calorieGoal}

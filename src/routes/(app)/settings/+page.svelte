@@ -183,8 +183,11 @@
 					</h2>
 					<div class="rounded-3xl bg-destructive/5 border border-destructive/10 p-5">
 						<h3 class="font-bold text-foreground mb-1">Delete Account</h3>
-						<p class="text-xs text-muted-foreground mb-4">
+						<p class="text-xs text-muted-foreground mb-2">
 							Permanently remove your account and all associated data. This action cannot be undone.
+						</p>
+						<p class="text-xs text-muted-foreground/70 mb-4">
+							Lifetime access is tied to your email — you won't lose it.
 						</p>
 						<Button
 							variant="destructive"

@@ -58,7 +58,7 @@
 				</div>
 			{/if}
 		</div>
-		<div class="flex min-w-0 flex-1 flex-col justify-center gap-2 p-3">
+		<div class="flex min-w-0 flex-1 flex-col justify-center p-2">
 			<div class="flex items-start justify-between gap-2">
 				<div class="min-w-0 flex-1">
 					<h3 class="line-clamp-1 font-bold leading-snug text-foreground">
@@ -78,20 +78,20 @@
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
 						<DropdownMenuItem onclick={() => onEdit(meal)}>
-							<PencilIcon class="mr-2 size-4" />
+							<PencilIcon class="size-4" />
 							Edit
 						</DropdownMenuItem>
 						<DropdownMenuItem
 							class="text-destructive focus:text-destructive"
 							onclick={() => onDelete(meal.id)}
 						>
-							<Trash2Icon class="mr-2 size-4" />
+							<Trash2Icon class="size-4" />
 							Delete
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
-			<div class="flex items-center justify-between gap-3">
+			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-1">
 					<span
 						class="rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-500 dark:bg-blue-400/10 dark:text-blue-400"

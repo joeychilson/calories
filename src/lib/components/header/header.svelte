@@ -2,18 +2,18 @@
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import HamburgerIcon from '@lucide/svelte/icons/hamburger';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import GoalIcon from '@lucide/svelte/icons/goal';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import type { User } from 'better-auth';
 	import HeaderUserMenu from './header-user-menu.svelte';
 
 	let {
 		user,
-		onSettingsClick,
+		onGoalsClick,
 		onAssistantClick
 	}: {
 		user: User;
-		onSettingsClick?: () => void;
+		onGoalsClick?: () => void;
 		onAssistantClick?: () => void;
 	} = $props();
 </script>
@@ -36,9 +36,9 @@
 					<SparklesIcon class="size-4 text-muted-foreground" />
 				</Button>
 			{/if}
-			{#if onSettingsClick}
-				<Button variant="outline" size="icon" class="size-8" onclick={onSettingsClick}>
-					<SettingsIcon class="size-4 text-muted-foreground" />
+			{#if onGoalsClick}
+				<Button variant="outline" size="icon" class="size-8" onclick={onGoalsClick}>
+					<GoalIcon class="size-4 text-muted-foreground" />
 				</Button>
 			{/if}
 			<HeaderUserMenu {user} />

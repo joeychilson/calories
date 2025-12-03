@@ -11,7 +11,7 @@
 	} from '$lib/components/ui/dropdown-menu';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MoonIcon from '@lucide/svelte/icons/moon';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import UserIcon from '@lucide/svelte/icons/user';
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import type { User } from 'better-auth';
 	import { mode, setMode } from 'mode-watcher';
@@ -38,9 +38,9 @@
 		{/snippet}
 	</DropdownMenuTrigger>
 	<DropdownMenuContent align="end" preventScroll={false}>
-		<DropdownMenuItem onclick={() => goto(resolve('/settings'))}>
-			<SettingsIcon class="size-4" />
-			<span>Settings</span>
+		<DropdownMenuItem onclick={() => goto(resolve('/account'))}>
+			<UserIcon class="size-4" />
+			<span>Account</span>
 		</DropdownMenuItem>
 		<DropdownMenuItem
 			onclick={() => {

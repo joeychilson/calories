@@ -4,11 +4,11 @@
 	import { page } from '$app/state';
 	import { CalorieSummary } from '$lib/components/calorie-summary';
 	import { DayNavigation } from '$lib/components/day-navigation';
-	import { FoodAssistantDialog, SettingsDialog } from '$lib/components/dialog';
+	import { FoodAssistantDialog, GoalsDialog } from '$lib/components/dialog';
 	import { MealsList } from '$lib/components/meals-list';
 	import { WaterTracker } from '$lib/components/water-tracker';
 	import { WeightTracker } from '$lib/components/weight-tracker';
-	import { assistantOpen, settingsOpen } from '$lib/stores/ui.store';
+	import { assistantOpen, goalsOpen } from '$lib/stores/ui.store';
 	import { formatDate } from '$lib/utils/format';
 	import { SvelteDate } from 'svelte/reactivity';
 
@@ -56,6 +56,6 @@
 		</div>
 	</div>
 
-	<SettingsDialog bind:open={$settingsOpen} />
+	<GoalsDialog bind:open={$goalsOpen} />
 	<FoodAssistantDialog bind:open={$assistantOpen} date={selectedDateStr} />
 </div>

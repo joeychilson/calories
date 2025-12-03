@@ -47,7 +47,7 @@
 </script>
 
 <svelte:head>
-	<title>Settings</title>
+	<title>Account</title>
 	<meta name="description" content="Manage your account and security settings" />
 	<meta name="robots" content="noindex" />
 </svelte:head>
@@ -63,7 +63,7 @@
 			>
 				<ChevronLeftIcon class="size-5 text-muted-foreground" />
 			</Button>
-			<h1 class="text-lg font-bold">Settings</h1>
+			<h1 class="text-lg font-bold">Account</h1>
 		</header>
 
 		<div class="flex-1 overflow-y-auto px-6 pb-20 no-scrollbar">

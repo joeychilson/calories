@@ -7,7 +7,7 @@
 	import { getProfile } from '$lib/remote/profile.remote';
 	import { getSubscription } from '$lib/remote/subscriptions.remote';
 	import { getLatestWeight } from '$lib/remote/weight.remote';
-	import { assistantOpen, settingsOpen } from '$lib/stores/ui.store';
+	import { assistantOpen, goalsOpen } from '$lib/stores/ui.store';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
@@ -19,7 +19,7 @@
 <div class="flex h-dvh flex-col">
 	<Header
 		user={data.user}
-		onSettingsClick={() => settingsOpen.set(true)}
+		onGoalsClick={() => goalsOpen.set(true)}
 		onAssistantClick={() => assistantOpen.set(true)}
 	/>
 	<main class="min-h-0 flex-1">

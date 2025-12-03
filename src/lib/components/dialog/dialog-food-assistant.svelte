@@ -18,7 +18,15 @@
 		InputGroupTextarea
 	} from '$lib/components/ui/input-group';
 	import type { Message, MessagePart } from '$lib/messages';
-	import { deleteUploadedImage, getImageUploadUrl } from '$lib/remote/meals.remote';
+	import {
+		addMeal,
+		deleteUploadedImage,
+		getImageUploadUrl,
+		getMeals
+	} from '$lib/remote/meals.remote';
+	import { getProfile } from '$lib/remote/profile.remote';
+	import { getWaterForDate } from '$lib/remote/water.remote';
+	import { getLatestWeight } from '$lib/remote/weight.remote';
 	import type { AssistantContext } from '$lib/server/assistant';
 	import type { MealInput } from '$lib/types';
 
@@ -44,13 +52,68 @@
 
 	let {
 		open = $bindable(false),
-		context,
-		onLogMeal
+		date
 	}: {
 		open?: boolean;
-		context: ClientAssistantContext;
-		onLogMeal?: (meal: MealInput) => void;
+		date: string;
 	} = $props();
+
+	const initialMeals = await getMeals();
+	const initialProfile = await getProfile();
+	const initialLatestWeight = await getLatestWeight();
+
+	const meals = $derived(getMeals().current ?? initialMeals);
+	const profile = $derived(getProfile().current ?? initialProfile);
+	const latestWeight = $derived(getLatestWeight().current ?? initialLatestWeight);
+	const waterData = $derived(getWaterForDate(date).current);
+
+	const currentDayMeals = $derived(meals.filter((m) => m.date === date));
+
+	const context = $derived<ClientAssistantContext>({
+		calorieGoal: profile?.calorieGoal ?? 2000,
+		caloriesConsumed: currentDayMeals.reduce((acc, m) => acc + m.calories, 0),
+		proteinConsumed: currentDayMeals.reduce((acc, m) => acc + (m.protein || 0), 0),
+		carbsConsumed: currentDayMeals.reduce((acc, m) => acc + (m.carbs || 0), 0),
+		fatConsumed: currentDayMeals.reduce((acc, m) => acc + (m.fat || 0), 0),
+		waterGoal: profile?.waterGoal ?? (profile?.units === 'imperial' ? 64 : 2000),
+		waterConsumed: waterData?.amount ?? 0,
+		currentWeight: latestWeight?.weight ?? null,
+		weightGoal: profile?.weightGoal ?? null,
+		units: profile?.units ?? 'imperial',
+		sex: profile?.sex ?? null,
+		activityLevel: profile?.activityLevel ?? 'moderate'
+	});
+
+	async function handleLogMeal(meal: MealInput) {
+		const now = new Date();
+		const [year, month, day] = date.split('-').map(Number);
+		const mealTime = new Date(
+			year,
+			month - 1,
+			day,
+			now.getHours(),
+			now.getMinutes(),
+			now.getSeconds()
+		).toISOString();
+
+		try {
+			await addMeal({
+				name: meal.name,
+				calories: meal.calories,
+				servings: meal.servings ?? 1,
+				protein: meal.protein,
+				carbs: meal.carbs,
+				fat: meal.fat,
+				imageKey: meal.imageKey,
+				mealDate: date,
+				mealTime
+			}).updates(getMeals());
+			toast.success(`Logged ${meal.name}`);
+		} catch (err) {
+			console.error('Failed to log meal:', err);
+			toast.error('Failed to log meal');
+		}
+	}
 
 	let imagePreview = $state<string | null>(null);
 	let imageData = $state<{ imageKey: string; downloadUrl: string; mimeType: string } | null>(null);
@@ -366,7 +429,7 @@
 														protein={part.input.protein}
 														carbs={part.input.carbs}
 														fat={part.input.fat}
-														onLog={() => onLogMeal?.(part.input as MealInput)}
+														onLog={() => handleLogMeal(part.input as MealInput)}
 													/>
 												{:else if part.type === 'tool-managePreference' && (part.state === 'input-available' || part.state === 'output-available')}
 													<ToolManagePreference

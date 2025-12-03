@@ -3,15 +3,20 @@
 	import { getProfile } from '$lib/remote/profile.remote';
 	import { getWaterForDate, updateWater } from '$lib/remote/water.remote';
 	import DropletIcon from '@lucide/svelte/icons/droplet';
+	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	let { date }: { date: string } = $props();
 
-	const initialProfile = await getProfile();
+	const initialDate = untrack(() => date);
+	const [initialProfile, initialWaterData] = await Promise.all([
+		getProfile(),
+		getWaterForDate(initialDate)
+	]);
 	const profile = $derived(getProfile().current ?? initialProfile);
-
-	const waterData = $derived(getWaterForDate(date).current);
-
+	const waterData = $derived(
+		getWaterForDate(date).current ?? (date === initialDate ? initialWaterData : null)
+	);
 	const useOz = $derived(profile?.units === 'imperial');
 	const waterUnit = $derived(useOz ? 'oz' : 'ml');
 	const waterSmallAmount = $derived(useOz ? 8 : 250);

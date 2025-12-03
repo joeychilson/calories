@@ -7,43 +7,37 @@
 		InputGroupText
 	} from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
-	import { updateProfile } from '$lib/remote/profile.remote';
+	import { getProfile, updateProfile } from '$lib/remote/profile.remote';
+	import { getLatestWeight } from '$lib/remote/weight.remote';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import { toast } from 'svelte-sonner';
 	import ResponsiveDialog from './dialog-responsive.svelte';
 
-	let {
-		open = $bindable(false),
-		currentCalorieGoal = 2200,
-		currentWaterGoal = 64,
-		currentWeightGoal = null as number | null,
-		currentWeight = null as number | null,
-		units = 'imperial',
-		onSave
-	}: {
-		open?: boolean;
-		currentCalorieGoal?: number;
-		currentWaterGoal?: number;
-		currentWeightGoal?: number | null;
-		currentWeight?: number | null;
-		units?: string;
-		onSave?: () => void;
-	} = $props();
+	let { open = $bindable(false) }: { open?: boolean } = $props();
+
+	const initialProfile = await getProfile();
+	const initialLatestWeight = await getLatestWeight();
+
+	const profile = $derived(getProfile().current ?? initialProfile);
+	const latestWeight = $derived(getLatestWeight().current ?? initialLatestWeight);
+
+	const units = $derived(profile?.units ?? 'imperial');
+	const currentWeight = $derived(latestWeight?.weight ?? null);
 
 	let calorieGoal = $state('');
 	let waterGoal = $state('');
 	let weightGoal = $state('');
 	let saving = $state(false);
 
-	let weightUnit = $derived(units === 'imperial' ? 'lbs' : 'kg');
-	let waterUnit = $derived(units === 'imperial' ? 'oz' : 'ml');
+	const weightUnit = $derived(units === 'imperial' ? 'lbs' : 'kg');
+	const waterUnit = $derived(units === 'imperial' ? 'oz' : 'ml');
 
 	$effect(() => {
-		if (open) {
-			calorieGoal = String(currentCalorieGoal);
-			waterGoal = String(currentWaterGoal);
-			weightGoal = currentWeightGoal ? String(currentWeightGoal) : '';
+		if (open && profile) {
+			calorieGoal = String(profile.calorieGoal ?? 2200);
+			waterGoal = String(profile.waterGoal ?? (units === 'imperial' ? 64 : 2000));
+			weightGoal = profile.weightGoal ? String(profile.weightGoal) : '';
 		}
 	});
 
@@ -57,8 +51,7 @@
 				calorieGoal: parseInt(calorieGoal),
 				waterGoal: parseInt(waterGoal),
 				...(weightGoal && { weightGoal: parseFloat(weightGoal) })
-			});
-			onSave?.();
+			}).updates(getProfile());
 			open = false;
 		} catch (err) {
 			console.error('Failed to save settings:', err);

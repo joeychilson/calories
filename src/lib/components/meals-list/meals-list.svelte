@@ -5,7 +5,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UtensilsIcon from '@lucide/svelte/icons/utensils';
 	import { toast } from 'svelte-sonner';
-	import MealItem from './meal-item.svelte';
+	import MealItem from './meals-list-item.svelte';
 
 	let { date }: { date: string } = $props();
 
@@ -23,7 +23,6 @@
 
 	const initialMeals = await getMeals();
 	const meals = $derived(getMeals().current ?? initialMeals);
-
 	const currentDayMeals = $derived.by(() => {
 		return meals.filter((m) => m.date === date).sort((a, b) => b.timestamp - a.timestamp);
 	});

@@ -20,20 +20,11 @@
 	let isDatePickerOpen = $state(false);
 	let wasDatePickerOpen = $state(false);
 
-	$effect(() => {
-		if (wasDatePickerOpen && !isDatePickerOpen) {
-			onDateChange?.();
-		}
-		wasDatePickerOpen = isDatePickerOpen;
-	});
-
 	const initialMeals = await getMeals();
 	const initialProfile = await getProfile();
-
 	const meals = $derived(getMeals().current ?? initialMeals);
 	const profile = $derived(getProfile().current ?? initialProfile);
 	const calorieGoal = $derived(profile?.calorieGoal ?? 2000);
-
 	const history = $derived.by(() => {
 		const historyMap = new SvelteMap<string, number>();
 		for (const m of meals) {
@@ -48,13 +39,19 @@
 					: ((cals > calorieGoal * 0.8 ? 'met' : 'under') as 'over' | 'met' | 'under')
 		}));
 	});
-
 	const isToday = $derived(formatDate(date) === formatDate(new Date()));
 
 	function handleDateChange(days: number) {
 		date.setDate(date.getDate() + days);
 		onDateChange?.();
 	}
+
+	$effect(() => {
+		if (wasDatePickerOpen && !isDatePickerOpen) {
+			onDateChange?.();
+		}
+		wasDatePickerOpen = isDatePickerOpen;
+	});
 </script>
 
 <header class="flex shrink-0 items-center justify-between px-4 py-2">

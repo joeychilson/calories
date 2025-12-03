@@ -4,21 +4,25 @@
 	import { getLatestWeight, getWeightForDate, logWeight } from '$lib/remote/weight.remote';
 	import { parseLocalDate } from '$lib/utils/format';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
+	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	let { date }: { date: string } = $props();
 
-	const dateObj = $derived(parseLocalDate(date));
-
 	let isModalOpen = $state(false);
 
-	const initialProfile = await getProfile();
-	const initialLatestWeight = await getLatestWeight();
-
+	const dateObj = $derived(parseLocalDate(date));
+	const initialDate = untrack(() => date);
+	const [initialProfile, initialLatestWeight, initialWeightForDate] = await Promise.all([
+		getProfile(),
+		getLatestWeight(),
+		getWeightForDate(initialDate)
+	]);
 	const profile = $derived(getProfile().current ?? initialProfile);
 	const latestWeight = $derived(getLatestWeight().current ?? initialLatestWeight);
-	const weightForDate = $derived(getWeightForDate(date).current);
-
+	const weightForDate = $derived(
+		getWeightForDate(date).current ?? (date === initialDate ? initialWeightForDate : null)
+	);
 	const units = $derived(profile?.units ?? 'imperial');
 	const weightUnit = $derived(units === 'metric' ? 'kg' : 'lbs');
 	const weightGoal = $derived(profile?.weightGoal ?? null);
@@ -68,25 +72,27 @@
 		/>
 	</div>
 	<div class="min-w-0 flex-1">
-		<div class="flex items-baseline gap-1">
-			<span class="text-lg font-bold tabular-nums">
-				{weightForDate?.weight ?? currentWeight ?? '—'}
+		{#key date}
+			<div class="flex items-baseline gap-1">
+				<span class="text-lg font-bold tabular-nums">
+					{weightForDate?.weight ?? currentWeight ?? '—'}
+				</span>
+				<span class="text-xs text-muted-foreground">
+					{#if weightGoal}/ {weightGoal} {weightUnit}{:else}{weightUnit}{/if}
+				</span>
+			</div>
+			<span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+				{#if weightForDate?.weight}
+					Weight logged
+				{:else if !currentWeight}
+					Tap to log weight
+				{:else if weightAtGoal}
+					Goal reached!
+				{:else}
+					{weightToGo.toFixed(1)} {weightUnit} to go
+				{/if}
 			</span>
-			<span class="text-xs text-muted-foreground">
-				{#if weightGoal}/ {weightGoal} {weightUnit}{:else}{weightUnit}{/if}
-			</span>
-		</div>
-		<span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-			{#if weightForDate?.weight}
-				Weight logged
-			{:else if !currentWeight}
-				Tap to log weight
-			{:else if weightAtGoal}
-				Goal reached!
-			{:else}
-				{weightToGo.toFixed(1)} {weightUnit} to go
-			{/if}
-		</span>
+		{/key}
 	</div>
 </button>
 

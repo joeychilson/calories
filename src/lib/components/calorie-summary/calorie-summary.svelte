@@ -5,18 +5,13 @@
 
 	let { date }: { date: string } = $props();
 
-	const initialMeals = await getMeals();
-	const initialProfile = await getProfile();
-
+	const [initialMeals, initialProfile] = await Promise.all([getMeals(), getProfile()]);
 	const meals = $derived(getMeals().current ?? initialMeals);
 	const profile = $derived(getProfile().current ?? initialProfile);
-
 	const calorieGoal = $derived(profile?.calorieGoal ?? 2000);
-
 	const currentDayMeals = $derived.by(() => {
 		return meals.filter((m) => m.date === date).sort((a, b) => b.timestamp - a.timestamp);
 	});
-
 	const chartMeals = $derived(
 		currentDayMeals.map((m) => ({
 			id: m.id,
@@ -24,7 +19,6 @@
 			calories: m.calories
 		}))
 	);
-
 	const totalProtein = $derived(currentDayMeals.reduce((acc, m) => acc + (m.protein || 0), 0));
 	const totalCarbs = $derived(currentDayMeals.reduce((acc, m) => acc + (m.carbs || 0), 0));
 	const totalFat = $derived(currentDayMeals.reduce((acc, m) => acc + (m.fat || 0), 0));

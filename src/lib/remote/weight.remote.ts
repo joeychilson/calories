@@ -40,7 +40,6 @@ export const logWeight = command(
 				.where(eq(weightLogs.id, existing.id))
 				.returning();
 		} else {
-			// Insert new entry
 			[log] = await db
 				.insert(weightLogs)
 				.values({

@@ -2,6 +2,7 @@ import { command, getRequestEvent, query } from '$app/server';
 import { MIME_TO_EXT } from '$lib/constants/mime';
 import { analyzePantryImage } from '$lib/server/ai';
 import { db } from '$lib/server/db';
+import { aiLimiter } from '$lib/server/ratelimit';
 import { pantryCategoryValues, pantryItems } from '$lib/server/schema';
 import {
 	deleteImage,
@@ -36,12 +37,16 @@ export const scanPantryImage = command(
 		mimeType: z.string().default('image/jpeg')
 	}),
 	async (input) => {
-		const { locals } = getRequestEvent();
-		if (!locals.session || !locals.user) {
+		const event = getRequestEvent();
+		if (!event.locals.session || !event.locals.user) {
 			return error(401, 'Unauthorized');
 		}
 
-		if (!input.imageKey.startsWith(`temp/${locals.user.id}/`)) {
+		if (await aiLimiter.isLimited(event)) {
+			return error(429, 'Too many requests. Please try again later.');
+		}
+
+		if (!input.imageKey.startsWith(`temp/${event.locals.user.id}/`)) {
 			return error(403, 'Invalid image key');
 		}
 
@@ -157,7 +162,7 @@ export const addPantryItems = command(
 
 export const updatePantryItem = command(
 	z.object({
-		id: z.string().uuid(),
+		id: z.uuid(),
 		name: z.string().min(1).optional(),
 		category: z.enum(pantryCategoryValues).optional(),
 		quantity: z.number().positive().optional(),

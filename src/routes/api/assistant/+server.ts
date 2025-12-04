@@ -5,6 +5,7 @@ import {
 	type FoodPreference,
 	type PantryItem
 } from '$lib/server/prompt';
+import { aiLimiter } from '$lib/server/ratelimit';
 import { type PantryCategory } from '$lib/server/schema';
 import { assistantTools } from '$lib/server/tools';
 import { db } from '$lib/server/db';
@@ -39,10 +40,16 @@ const contextSchema = z.object({
 	timezone: z.string().max(100).optional()
 });
 
-export const POST: RequestHandler = async ({ locals, request }) => {
+export const POST: RequestHandler = async (event) => {
+	const { locals, request } = event;
 	if (!locals.user || !locals.session) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
+
+	if (await aiLimiter.isLimited(event)) {
+		return json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+	}
+
 	const userId = locals.user.id;
 
 	try {

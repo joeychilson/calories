@@ -1,4 +1,5 @@
 import { command, getRequestEvent, query } from '$app/server';
+import { EXT_TO_MIME, MIME_TO_EXT } from '$lib/constants/mime';
 import { analyzeMealFromImage, analyzeMealFromText } from '$lib/server/ai';
 import { db } from '$lib/server/db';
 import { mealLogs } from '$lib/server/schema';
@@ -14,18 +15,47 @@ import { error } from '@sveltejs/kit';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-const MIME_TO_EXT: Record<string, string> = {
-	'image/jpeg': 'jpg',
-	'image/png': 'png',
-	'image/webp': 'webp'
-};
+const nutritionFieldsSchema = z.object({
+	calories: z.number().int().positive().max(50000),
+	protein: z.number().int().nonnegative().max(5000).optional(),
+	carbs: z.number().int().nonnegative().max(5000).optional(),
+	fat: z.number().int().nonnegative().max(5000).optional()
+});
 
-const EXT_TO_MIME: Record<string, string> = {
-	jpg: 'image/jpeg',
-	jpeg: 'image/jpeg',
-	png: 'image/png',
-	webp: 'image/webp'
-};
+const mealFieldsSchema = nutritionFieldsSchema.extend({
+	name: z.string().min(1).max(200),
+	servings: z.number().positive().max(100).default(1)
+});
+
+type MealLog = typeof mealLogs.$inferSelect;
+
+export interface MealResponse {
+	id: string;
+	name: string;
+	servings: number;
+	calories: number;
+	protein: number | null;
+	carbs: number | null;
+	fat: number | null;
+	image: string | null;
+	date: string;
+	timestamp: number;
+}
+
+function mealToResponse(meal: MealLog): MealResponse {
+	return {
+		id: meal.id,
+		name: meal.name,
+		servings: meal.servings,
+		calories: meal.calories,
+		protein: meal.protein,
+		carbs: meal.carbs,
+		fat: meal.fat,
+		image: meal.image ? getPresignedUrl(meal.image) : null,
+		date: meal.mealDate,
+		timestamp: meal.mealTime.getTime()
+	};
+}
 
 export const getImageUploadUrl = command(z.object({ mimeType: z.string() }), async (input) => {
 	const { locals } = getRequestEvent();
@@ -154,13 +184,7 @@ export const analyzeMealText = command(
 );
 
 export const addMeal = command(
-	z.object({
-		name: z.string().min(1).max(200),
-		servings: z.number().positive().max(100).default(1),
-		calories: z.number().int().positive().max(50000),
-		protein: z.number().int().nonnegative().max(5000).optional(),
-		carbs: z.number().int().nonnegative().max(5000).optional(),
-		fat: z.number().int().nonnegative().max(5000).optional(),
+	mealFieldsSchema.extend({
 		imageKey: z.string().optional(),
 		mealDate: z.string(),
 		mealTime: z.string().optional()
@@ -203,18 +227,7 @@ export const addMeal = command(
 				})
 				.returning();
 
-			return {
-				id: meal.id,
-				name: meal.name,
-				servings: meal.servings,
-				calories: meal.calories,
-				protein: meal.protein,
-				carbs: meal.carbs,
-				fat: meal.fat,
-				image: meal.image ? getPresignedUrl(meal.image) : null,
-				date: meal.mealDate,
-				timestamp: meal.mealTime.getTime()
-			};
+			return mealToResponse(meal);
 		} catch (err) {
 			if (permanentImageKey) {
 				try {
@@ -252,53 +265,31 @@ export const deleteMeal = command(z.string().uuid(), async (id) => {
 	return { success: true };
 });
 
-export const updateMeal = command(
-	z.object({
-		id: z.uuid(),
-		name: z.string().min(1).max(200),
-		servings: z.number().positive().max(100).default(1),
-		calories: z.number().int().positive().max(50000),
-		protein: z.number().int().nonnegative().max(5000).optional(),
-		carbs: z.number().int().nonnegative().max(5000).optional(),
-		fat: z.number().int().nonnegative().max(5000).optional()
-	}),
-	async (input) => {
-		const { locals } = getRequestEvent();
-		if (!locals.session || !locals.user) {
-			return error(401, 'Unauthorized');
-		}
-
-		const [updatedMeal] = await db
-			.update(mealLogs)
-			.set({
-				name: input.name,
-				servings: input.servings,
-				calories: input.calories,
-				protein: input.protein,
-				carbs: input.carbs,
-				fat: input.fat
-			})
-			.where(and(eq(mealLogs.id, input.id), eq(mealLogs.userId, locals.user.id)))
-			.returning();
-
-		if (!updatedMeal) {
-			return error(404, 'Meal not found');
-		}
-
-		return {
-			id: updatedMeal.id,
-			name: updatedMeal.name,
-			servings: updatedMeal.servings,
-			calories: updatedMeal.calories,
-			protein: updatedMeal.protein,
-			carbs: updatedMeal.carbs,
-			fat: updatedMeal.fat,
-			image: updatedMeal.image ? getPresignedUrl(updatedMeal.image) : null,
-			date: updatedMeal.mealDate,
-			timestamp: updatedMeal.mealTime.getTime()
-		};
+export const updateMeal = command(mealFieldsSchema.extend({ id: z.uuid() }), async (input) => {
+	const { locals } = getRequestEvent();
+	if (!locals.session || !locals.user) {
+		return error(401, 'Unauthorized');
 	}
-);
+
+	const [updatedMeal] = await db
+		.update(mealLogs)
+		.set({
+			name: input.name,
+			servings: input.servings,
+			calories: input.calories,
+			protein: input.protein,
+			carbs: input.carbs,
+			fat: input.fat
+		})
+		.where(and(eq(mealLogs.id, input.id), eq(mealLogs.userId, locals.user.id)))
+		.returning();
+
+	if (!updatedMeal) {
+		return error(404, 'Meal not found');
+	}
+
+	return mealToResponse(updatedMeal);
+});
 
 export const getMeals = query(async () => {
 	const { locals } = getRequestEvent();
@@ -313,16 +304,5 @@ export const getMeals = query(async () => {
 		.where(eq(mealLogs.userId, locals.user.id))
 		.orderBy(desc(mealLogs.mealTime));
 
-	return meals.map((m) => ({
-		id: m.id,
-		name: m.name,
-		servings: m.servings,
-		calories: m.calories,
-		protein: m.protein,
-		carbs: m.carbs,
-		fat: m.fat,
-		image: m.image ? getPresignedUrl(m.image) : null,
-		date: m.mealDate,
-		timestamp: m.mealTime.getTime()
-	}));
+	return meals.map(mealToResponse);
 });

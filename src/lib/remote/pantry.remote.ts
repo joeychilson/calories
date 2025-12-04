@@ -1,7 +1,8 @@
 import { command, getRequestEvent, query } from '$app/server';
+import { MIME_TO_EXT } from '$lib/constants/mime';
 import { analyzePantryImage } from '$lib/server/ai';
 import { db } from '$lib/server/db';
-import { pantryItems } from '$lib/server/schema';
+import { pantryCategoryValues, pantryItems } from '$lib/server/schema';
 import {
 	deleteImage,
 	getImageBuffer,
@@ -12,17 +13,6 @@ import { error } from '@sveltejs/kit';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-const pantryCategories = [
-	'protein',
-	'vegetable',
-	'fruit',
-	'dairy',
-	'grain',
-	'pantry',
-	'beverage',
-	'other'
-] as const;
-
 export const getPantryImageUploadUrl = command(
 	z.object({ mimeType: z.string() }),
 	async (input) => {
@@ -30,12 +20,6 @@ export const getPantryImageUploadUrl = command(
 		if (!locals.session || !locals.user) {
 			return error(401, 'Unauthorized');
 		}
-
-		const MIME_TO_EXT: Record<string, string> = {
-			'image/jpeg': 'jpg',
-			'image/png': 'png',
-			'image/webp': 'webp'
-		};
 
 		const ext = MIME_TO_EXT[input.mimeType] || 'jpg';
 		const timestamp = Date.now();
@@ -96,7 +80,7 @@ export const scanPantryImage = command(
 export const addPantryItem = command(
 	z.object({
 		name: z.string().min(1),
-		category: z.enum(pantryCategories).optional(),
+		category: z.enum(pantryCategoryValues).optional(),
 		quantity: z.number().positive().optional(),
 		unit: z.string().optional()
 	}),
@@ -131,7 +115,7 @@ export const addPantryItems = command(
 	z.array(
 		z.object({
 			name: z.string().min(1),
-			category: z.enum(pantryCategories).optional(),
+			category: z.enum(pantryCategoryValues).optional(),
 			quantity: z.number().positive().optional(),
 			unit: z.string().optional()
 		})
@@ -175,7 +159,7 @@ export const updatePantryItem = command(
 	z.object({
 		id: z.string().uuid(),
 		name: z.string().min(1).optional(),
-		category: z.enum(pantryCategories).optional(),
+		category: z.enum(pantryCategoryValues).optional(),
 		quantity: z.number().positive().optional(),
 		unit: z.string().optional()
 	}),

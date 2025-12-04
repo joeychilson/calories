@@ -2,20 +2,24 @@ import { tool } from 'ai';
 import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
-import { foodPreferences, mealLogs, pantryItems, profiles, weightLogs } from './schema';
+import {
+	foodPreferences,
+	mealLogs,
+	pantryCategoryValues,
+	pantryItems,
+	preferenceCategoryValues,
+	profiles,
+	weightLogs,
+	type PantryCategory,
+	type PreferenceCategory
+} from './schema';
 
-export const preferenceCategories = [
-	'like',
-	'dislike',
-	'allergy',
-	'dietary',
-	'cuisine',
-	'timing',
-	'portion',
-	'other'
-] as const;
-
-export type PreferenceCategory = (typeof preferenceCategories)[number];
+// Re-export for backwards compatibility
+export {
+	pantryCategoryValues as pantryCategories,
+	preferenceCategoryValues as preferenceCategories
+};
+export type { PantryCategory, PreferenceCategory };
 
 export interface FoodPreference {
 	id: string;
@@ -23,19 +27,6 @@ export interface FoodPreference {
 	value: string;
 	notes: string | null;
 }
-
-export const pantryCategories = [
-	'protein',
-	'vegetable',
-	'fruit',
-	'dairy',
-	'grain',
-	'pantry',
-	'beverage',
-	'other'
-] as const;
-
-export type PantryCategory = (typeof pantryCategories)[number];
 
 export interface PantryItem {
 	id: string;
@@ -450,7 +441,7 @@ DELETE: Remove a preference when it no longer applies (e.g., "I actually like mu
 	inputSchema: z.object({
 		operation: z.enum(['create', 'update', 'delete']).describe('Operation to perform'),
 		category: z
-			.enum(preferenceCategories)
+			.enum(preferenceCategoryValues)
 			.describe(
 				'Type of preference: like, dislike, allergy, dietary, cuisine, timing, portion, other'
 			),
@@ -532,8 +523,19 @@ const queryMealHistory = tool({
 			.optional()
 			.describe('Start date in YYYY-MM-DD format (for date_range query)'),
 		endDate: z.string().optional().describe('End date in YYYY-MM-DD format (for date_range query)'),
-		searchTerm: z.string().max(200).optional().describe('Food name to search for (for search query)'),
-		limit: z.number().int().min(1).max(100).optional().default(10).describe('Maximum number of results to return (1-100)')
+		searchTerm: z
+			.string()
+			.max(200)
+			.optional()
+			.describe('Food name to search for (for search query)'),
+		limit: z
+			.number()
+			.int()
+			.min(1)
+			.max(100)
+			.optional()
+			.default(10)
+			.describe('Maximum number of results to return (1-100)')
 	}),
 	execute: async (input, { experimental_context: context }) => {
 		const ctx = getToolContext(context);
@@ -991,7 +993,13 @@ Use queryMealHistory first to find the meal ID if needed.`,
 		mealId: z.string().describe('The ID of the meal to edit'),
 		name: z.string().max(200).optional().describe('New name for the meal'),
 		calories: z.number().int().positive().max(50000).optional().describe('Updated calories'),
-		protein: z.number().int().nonnegative().max(5000).optional().describe('Updated protein in grams'),
+		protein: z
+			.number()
+			.int()
+			.nonnegative()
+			.max(5000)
+			.optional()
+			.describe('Updated protein in grams'),
 		carbs: z.number().int().nonnegative().max(5000).optional().describe('Updated carbs in grams'),
 		fat: z.number().int().nonnegative().max(5000).optional().describe('Updated fat in grams'),
 		servings: z.number().positive().max(100).optional().describe('Updated number of servings')
@@ -1062,7 +1070,7 @@ const queryPantry = tool({
 - Help suggest meals based on what they have`,
 	inputSchema: z.object({
 		category: z
-			.enum(pantryCategories)
+			.enum(pantryCategoryValues)
 			.optional()
 			.describe(
 				'Filter by category (protein, vegetable, fruit, dairy, grain, pantry, beverage, other)'
@@ -1136,7 +1144,7 @@ Operations:
 		operation: z.enum(['add', 'update', 'delete']).describe('Operation to perform'),
 		name: z.string().max(200).describe('Name of the item'),
 		category: z
-			.enum(pantryCategories)
+			.enum(pantryCategoryValues)
 			.optional()
 			.describe('Category: protein, vegetable, fruit, dairy, grain, pantry, beverage, other'),
 		quantity: z.number().nonnegative().max(10000).optional().describe('Quantity of the item'),

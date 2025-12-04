@@ -1,3 +1,5 @@
+CREATE TYPE "public"."pantry_category" AS ENUM('protein', 'vegetable', 'fruit', 'dairy', 'grain', 'pantry', 'beverage', 'other');--> statement-breakpoint
+CREATE TYPE "public"."preference_category" AS ENUM('like', 'dislike', 'allergy', 'dietary', 'cuisine', 'timing', 'portion', 'other');--> statement-breakpoint
 CREATE TABLE "accounts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -17,7 +19,7 @@ CREATE TABLE "accounts" (
 CREATE TABLE "food_preferences" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
-	"category" text NOT NULL,
+	"category" "preference_category" NOT NULL,
 	"value" text NOT NULL,
 	"notes" text,
 	"created_at" timestamp NOT NULL,
@@ -44,7 +46,7 @@ CREATE TABLE "pantry_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"name" text NOT NULL,
-	"category" text,
+	"category" "pantry_category",
 	"quantity" real DEFAULT 1 NOT NULL,
 	"unit" text DEFAULT 'count' NOT NULL,
 	"created_at" timestamp NOT NULL,

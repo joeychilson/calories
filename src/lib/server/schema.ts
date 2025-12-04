@@ -1,4 +1,36 @@
-import { boolean, index, integer, pgTable, real, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+	boolean,
+	index,
+	integer,
+	pgEnum,
+	pgTable,
+	real,
+	text,
+	timestamp,
+	uuid
+} from 'drizzle-orm/pg-core';
+
+export const pantryCategoryEnum = pgEnum('pantry_category', [
+	'protein',
+	'vegetable',
+	'fruit',
+	'dairy',
+	'grain',
+	'pantry',
+	'beverage',
+	'other'
+]);
+
+export const preferenceCategoryEnum = pgEnum('preference_category', [
+	'like',
+	'dislike',
+	'allergy',
+	'dietary',
+	'cuisine',
+	'timing',
+	'portion',
+	'other'
+]);
 
 export const users = pgTable(
 	'users',
@@ -220,7 +252,7 @@ export const foodPreferences = pgTable(
 		userId: uuid('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		category: text('category').notNull(),
+		category: preferenceCategoryEnum('category').notNull(),
 		value: text('value').notNull(),
 		notes: text('notes'),
 		createdAt: timestamp('created_at')
@@ -244,7 +276,7 @@ export const pantryItems = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
-		category: text('category'),
+		category: pantryCategoryEnum('category'),
 		quantity: real('quantity').default(1).notNull(),
 		unit: text('unit').default('count').notNull(),
 		createdAt: timestamp('created_at')
@@ -259,3 +291,8 @@ export const pantryItems = pgTable(
 		index('pantry_items_category_idx').on(table.category)
 	]
 );
+
+export type PantryCategory = (typeof pantryCategoryEnum.enumValues)[number];
+export type PreferenceCategory = (typeof preferenceCategoryEnum.enumValues)[number];
+export const pantryCategoryValues = pantryCategoryEnum.enumValues;
+export const preferenceCategoryValues = preferenceCategoryEnum.enumValues;

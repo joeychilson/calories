@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
 	import {
@@ -183,7 +184,7 @@
 
 			await markOnboardingComplete();
 
-			goto('/');
+			goto(resolve('/'));
 		} catch (err) {
 			console.error('Failed to complete onboarding:', err);
 			toast.error('Failed to save settings');

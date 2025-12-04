@@ -9,15 +9,16 @@ export const load: LayoutServerLoad = async ({ parent, url, request }) => {
 		throw redirect(302, '/signin');
 	}
 
-	const skipSubscriptionCheck =
-		url.pathname.startsWith('/checkout') || url.pathname.startsWith('/onboarding');
+	const isOnboarding = url.pathname.startsWith('/onboarding');
+
+	if (!isOnboarding && !user.onboardingCompleted) {
+		throw redirect(302, '/onboarding');
+	}
+
+	const skipSubscriptionCheck = url.pathname.startsWith('/checkout') || isOnboarding;
 
 	if (skipSubscriptionCheck || !isHostedMode()) {
 		return { trialEnd: null };
-	}
-
-	if (!user.onboardingCompleted) {
-		throw redirect(302, '/onboarding');
 	}
 
 	const subscriptions = await auth.api.listActiveSubscriptions({

@@ -13,7 +13,7 @@ export const load: LayoutServerLoad = async ({ parent, url, request }) => {
 		url.pathname.startsWith('/checkout') || url.pathname.startsWith('/onboarding');
 
 	if (skipSubscriptionCheck || !isHostedMode()) {
-		return;
+		return { trialEnd: null };
 	}
 
 	if (!user.onboardingCompleted) {
@@ -24,11 +24,15 @@ export const load: LayoutServerLoad = async ({ parent, url, request }) => {
 		headers: request.headers
 	});
 
-	const hasActiveSubscription = subscriptions?.some(
+	const activeSubscription = subscriptions?.find(
 		(sub) => sub.status === 'active' || sub.status === 'trialing'
 	);
 
-	if (!hasActiveSubscription) {
+	if (!activeSubscription) {
 		throw redirect(302, '/checkout');
 	}
+
+	const trialEnd = activeSubscription.status === 'trialing' ? activeSubscription.trialEnd : null;
+
+	return { trialEnd };
 };

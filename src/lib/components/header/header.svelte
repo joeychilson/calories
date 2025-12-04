@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import HamburgerIcon from '@lucide/svelte/icons/hamburger';
 	import GoalIcon from '@lucide/svelte/icons/goal';
@@ -9,13 +10,24 @@
 
 	let {
 		user,
+		trialEnd,
 		onGoalsClick,
 		onAssistantClick
 	}: {
 		user?: User;
+		trialEnd?: Date | string | null;
 		onGoalsClick?: () => void;
 		onAssistantClick?: () => void;
 	} = $props();
+
+	const trialDaysLeft = $derived.by(() => {
+		if (!trialEnd) return null;
+		const end = new Date(trialEnd);
+		const now = new Date();
+		const diffMs = end.getTime() - now.getTime();
+		const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+		return diffDays > 0 ? diffDays : null;
+	});
 </script>
 
 <header class="bg-background sticky top-0 z-50 w-full px-4 transition-all">
@@ -29,6 +41,11 @@
 				</div>
 				Calories
 			</a>
+			{#if trialDaysLeft}
+				<Badge variant="secondary" class="text-xs">
+					{trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left
+				</Badge>
+			{/if}
 		</div>
 		{#if user}
 			<div class="flex items-center gap-1">

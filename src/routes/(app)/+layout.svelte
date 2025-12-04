@@ -22,6 +22,7 @@
 	{#if data.user}
 		<Header
 			user={data.user}
+			trialEnd={data.trialEnd}
 			onGoalsClick={() => goalsOpen.set(true)}
 			onAssistantClick={() => assistantOpen.set(true)}
 		/>

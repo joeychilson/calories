@@ -9,7 +9,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import Stripe from 'stripe';
 
-const stripeClient = new Stripe(privateEnv.STRIPE_SECRET_KEY || '');
+const stripeClient = isHostedMode() ? new Stripe(privateEnv.STRIPE_SECRET_KEY!) : null;
 
 export const auth = betterAuth({
 	baseURL: publicEnv.PUBLIC_BASE_URL,
@@ -51,7 +51,7 @@ export const auth = betterAuth({
 	plugins: isHostedMode()
 		? [
 				stripe({
-					stripeClient,
+					stripeClient: stripeClient!,
 					stripeWebhookSecret: privateEnv.STRIPE_WEBHOOK_SECRET!,
 					createCustomerOnSignUp: true,
 					subscription: {

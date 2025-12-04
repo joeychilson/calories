@@ -4,9 +4,9 @@ A simple, AI-powered nutrition tracking app.
 
 ## Features
 
-- **AI Meal Logging** - Snap a photo or describe your meal to get instant calorie and macro estimates
+- **Meal Logging** - Snap a photo or describe your meal to get instant calorie and macro estimates
 - **Smart Dashboard** - Track calories, protein, carbs, and fat with visual progress rings
-- **AI Food Assistant** - Get personalized meal suggestions and ask nutrition questions
+- **Food Assistant** - Get personalized meal suggestions and ask nutrition questions
 - **Weight & Water Tracking** - Set goals and track progress with quick-add buttons
 
 ## Tech Stack
@@ -22,7 +22,6 @@ A simple, AI-powered nutrition tracking app.
 ### Prerequisites
 
 - Bun
-- Node.js
 - A PostgreSQL database
 - AI Gateway API key
 
@@ -30,7 +29,7 @@ A simple, AI-powered nutrition tracking app.
 
 ```bash
 # Clone the repository
-git clone https://github.com/float32org/calories.git
+git clone https://github.com/joeychilson/calories.git
 cd calories
 
 # Install dependencies
@@ -57,4 +56,4 @@ MIT
 ## Links
 
 - [Website](https://burncalories.app)
-- [Landing Page](https://github.com/float32org/calories-landing)
+- [Landing Page](https://github.com/joeychilson/calories-landing)

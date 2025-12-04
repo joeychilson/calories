@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+
+# Build outputs
+build
+.output
+.svelte-kit
+
+# Version control
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE and OS
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+*.test.ts
+*.spec.ts
+__tests__
+
+# Documentation
+README.md
+LICENSE

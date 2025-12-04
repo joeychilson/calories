@@ -1,12 +1,12 @@
 import type { Message } from '$lib/messages';
 import {
-	assistantTools,
 	buildSystemPrompt,
 	type AssistantContext,
 	type FoodPreference,
-	type PantryCategory,
 	type PantryItem
-} from '$lib/server/assistant';
+} from '$lib/server/prompt';
+import { type PantryCategory } from '$lib/server/schema';
+import { assistantTools } from '$lib/server/tools';
 import { db } from '$lib/server/db';
 import { gateway } from '$lib/server/gateway';
 import { foodPreferences, pantryItems } from '$lib/server/schema';

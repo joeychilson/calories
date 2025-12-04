@@ -12,7 +12,7 @@
 		scanPantryImage,
 		updatePantryItem
 	} from '$lib/remote/pantry.remote';
-	import { type PantryCategory } from '$lib/server/assistant';
+	import { type PantryCategory } from '$lib/server/schema';
 	import CameraIcon from '@lucide/svelte/icons/camera';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';

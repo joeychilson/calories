@@ -1,4 +1,4 @@
-import { assistantTools } from '$lib/server/assistant';
+import { assistantTools } from '$lib/server/tools';
 import type { InferUITools, UIMessage, UIMessagePart } from 'ai';
 
 export type MessageMetadata = {

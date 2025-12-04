@@ -8,6 +8,12 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 
+ARG DATABASE_URL
+ARG S3_ENDPOINT
+ARG S3_ACCESS_KEY_ID
+ARG S3_SECRET_ACCESS_KEY
+ARG AI_GATEWAY_API_KEY
+
 RUN bun run build
 
 FROM oven/bun:1-slim AS production

@@ -300,6 +300,49 @@ export const pantryItems = pgTable(
 	]
 );
 
+export const shoppingLists = pgTable(
+	'shopping_lists',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		createdAt: timestamp('created_at')
+			.$defaultFn(() => new Date())
+			.notNull(),
+		updatedAt: timestamp('updated_at')
+			.$defaultFn(() => new Date())
+			.notNull()
+	},
+	(table) => [index('shopping_lists_user_id_idx').on(table.userId)]
+);
+
+export const shoppingListItems = pgTable(
+	'shopping_list_items',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		listId: uuid('list_id')
+			.notNull()
+			.references(() => shoppingLists.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		category: pantryCategoryEnum('category'),
+		quantity: real('quantity').default(1).notNull(),
+		unit: text('unit').default('count').notNull(),
+		checked: boolean('checked').default(false).notNull(),
+		createdAt: timestamp('created_at')
+			.$defaultFn(() => new Date())
+			.notNull(),
+		updatedAt: timestamp('updated_at')
+			.$defaultFn(() => new Date())
+			.notNull()
+	},
+	(table) => [
+		index('shopping_list_items_list_id_idx').on(table.listId),
+		index('shopping_list_items_checked_idx').on(table.checked)
+	]
+);
+
 export type PantryCategory = (typeof pantryCategoryEnum.enumValues)[number];
 export type PreferenceCategory = (typeof preferenceCategoryEnum.enumValues)[number];
 export const pantryCategoryValues = pantryCategoryEnum.enumValues;

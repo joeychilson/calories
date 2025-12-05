@@ -5,4 +5,4 @@ export { default as EditMealDialog } from './dialog-edit-meal.svelte';
 export { default as FoodAssistantDialog } from './dialog-food-assistant.svelte';
 export { default as WeightLogDialog } from './dialog-log-weight.svelte';
 export { default as GoalsDialog } from './dialog-goals.svelte';
-export { default as PantryDialog } from './dialog-pantry.svelte';
+export { default as InventoryDialog } from './dialog-inventory.svelte';

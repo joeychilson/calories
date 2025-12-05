@@ -9,6 +9,8 @@ import {
 	pantryItems,
 	preferenceCategoryValues,
 	profiles,
+	shoppingListItems,
+	shoppingLists,
 	waterLogs,
 	weightLogs
 } from './schema';
@@ -869,7 +871,6 @@ Operations:
 			};
 		}
 
-		// Add operation
 		const [newItem] = await db
 			.insert(pantryItems)
 			.values({
@@ -894,6 +895,343 @@ Operations:
 	}
 });
 
+const DEFAULT_SHOPPING_LIST_NAME = 'Shopping List';
+
+export const queryShoppingLists = tool({
+	description: `Query the user's shopping lists to see what they need to buy. Use this to:
+- View all shopping lists and their items
+- Check what's on a specific list
+- See what items are checked off vs still needed
+- Help plan grocery trips`,
+	inputSchema: z.object({
+		listName: z.string().optional().describe('Filter to a specific list by name')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { listName } = input;
+
+		const lists = await db
+			.select()
+			.from(shoppingLists)
+			.where(eq(shoppingLists.userId, ctx.userId))
+			.orderBy(desc(shoppingLists.updatedAt));
+
+		let filteredLists = lists;
+		if (listName) {
+			filteredLists = lists.filter((l) => l.name.toLowerCase().includes(listName.toLowerCase()));
+		}
+
+		const listsWithItems = await Promise.all(
+			filteredLists.map(async (list) => {
+				const items = await db
+					.select({
+						id: shoppingListItems.id,
+						name: shoppingListItems.name,
+						category: shoppingListItems.category,
+						quantity: shoppingListItems.quantity,
+						unit: shoppingListItems.unit,
+						checked: shoppingListItems.checked
+					})
+					.from(shoppingListItems)
+					.where(eq(shoppingListItems.listId, list.id))
+					.orderBy(shoppingListItems.checked, desc(shoppingListItems.createdAt));
+
+				return {
+					id: list.id,
+					name: list.name,
+					itemCount: items.length,
+					checkedCount: items.filter((i) => i.checked).length,
+					items
+				};
+			})
+		);
+
+		return {
+			success: true,
+			totalLists: listsWithItems.length,
+			lists: listsWithItems
+		};
+	}
+});
+
+export const manageShoppingList = tool({
+	description: `Create, rename, or delete shopping lists. Use this when:
+- User wants to create a new shopping list ("create a Costco list")
+- User wants to rename a list
+- User wants to delete a list`,
+	inputSchema: z.object({
+		operation: z.enum(['create', 'rename', 'delete']).describe('Operation to perform'),
+		name: z.string().max(100).describe('Name of the list (for create/rename)'),
+		listId: z.string().optional().describe('List ID (required for rename/delete)')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { operation, name, listId } = input;
+
+		if (operation === 'delete') {
+			if (!listId) {
+				return { success: false, error: 'List ID required for delete' };
+			}
+
+			const [deleted] = await db
+				.delete(shoppingLists)
+				.where(and(eq(shoppingLists.id, listId), eq(shoppingLists.userId, ctx.userId)))
+				.returning();
+
+			if (!deleted) {
+				return { success: false, error: 'List not found' };
+			}
+
+			return { success: true, deleted: { id: deleted.id, name: deleted.name } };
+		}
+
+		if (operation === 'rename') {
+			if (!listId) {
+				return { success: false, error: 'List ID required for rename' };
+			}
+
+			const [updated] = await db
+				.update(shoppingLists)
+				.set({ name, updatedAt: new Date() })
+				.where(and(eq(shoppingLists.id, listId), eq(shoppingLists.userId, ctx.userId)))
+				.returning();
+
+			if (!updated) {
+				return { success: false, error: 'List not found' };
+			}
+
+			return { success: true, updated: { id: updated.id, name: updated.name } };
+		}
+
+		const [newList] = await db
+			.insert(shoppingLists)
+			.values({
+				userId: ctx.userId,
+				name
+			})
+			.returning();
+
+		return {
+			success: true,
+			created: { id: newList.id, name: newList.name }
+		};
+	}
+});
+
+export const addToShoppingList = tool({
+	description: `Add items to a shopping list. Use this when:
+- User wants to add items to their shopping list
+- Suggesting a meal that requires ingredients the user doesn't have
+- User asks to remember to buy something
+
+If no list is specified, items will be added to the default "Shopping List" (created if it doesn't exist).`,
+	inputSchema: z.object({
+		items: z
+			.array(
+				z.object({
+					name: z.string().max(200).describe('Name of the item'),
+					category: z
+						.enum(pantryCategoryValues)
+						.optional()
+						.describe('Category: protein, vegetable, fruit, dairy, grain, pantry, beverage, other'),
+					quantity: z.number().positive().optional().describe('Quantity'),
+					unit: z.string().max(50).optional().describe('Unit (lbs, oz, count, etc.)')
+				})
+			)
+			.describe('Items to add to the shopping list'),
+		listName: z
+			.string()
+			.optional()
+			.describe('Name of the list to add to (defaults to "Shopping List")')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { items, listName } = input;
+
+		if (items.length === 0) {
+			return { success: false, error: 'No items provided' };
+		}
+
+		const targetListName = listName || DEFAULT_SHOPPING_LIST_NAME;
+		let [list] = await db
+			.select()
+			.from(shoppingLists)
+			.where(and(eq(shoppingLists.userId, ctx.userId), eq(shoppingLists.name, targetListName)));
+
+		if (!list) {
+			[list] = await db
+				.insert(shoppingLists)
+				.values({
+					userId: ctx.userId,
+					name: targetListName
+				})
+				.returning();
+		}
+
+		const insertedItems = await db
+			.insert(shoppingListItems)
+			.values(
+				items.map((item) => ({
+					listId: list.id,
+					name: item.name,
+					category: item.category,
+					quantity: item.quantity,
+					unit: item.unit
+				}))
+			)
+			.returning();
+
+		await db
+			.update(shoppingLists)
+			.set({ updatedAt: new Date() })
+			.where(eq(shoppingLists.id, list.id));
+
+		return {
+			success: true,
+			listName: list.name,
+			addedCount: insertedItems.length,
+			items: insertedItems.map((i) => ({
+				id: i.id,
+				name: i.name,
+				category: i.category,
+				quantity: i.quantity,
+				unit: i.unit
+			}))
+		};
+	}
+});
+
+export const removeFromShoppingList = tool({
+	description: `Remove items from a shopping list. Use this when:
+- User says they don't need something anymore
+- User already has an item
+- Correcting a mistake`,
+	inputSchema: z.object({
+		itemIds: z.array(z.string()).optional().describe('Specific item IDs to remove'),
+		itemNames: z.array(z.string()).optional().describe('Item names to search for and remove'),
+		listName: z
+			.string()
+			.optional()
+			.describe('List to remove from (searches all lists if not specified)')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { itemIds, itemNames, listName } = input;
+
+		if (!itemIds?.length && !itemNames?.length) {
+			return { success: false, error: 'Must provide itemIds or itemNames' };
+		}
+
+		const removed: { id: string; name: string }[] = [];
+
+		if (itemIds?.length) {
+			for (const itemId of itemIds) {
+				const [item] = await db
+					.select({ item: shoppingListItems, list: shoppingLists })
+					.from(shoppingListItems)
+					.innerJoin(shoppingLists, eq(shoppingListItems.listId, shoppingLists.id))
+					.where(and(eq(shoppingListItems.id, itemId), eq(shoppingLists.userId, ctx.userId)));
+
+				if (item) {
+					await db.delete(shoppingListItems).where(eq(shoppingListItems.id, itemId));
+					removed.push({ id: item.item.id, name: item.item.name });
+				}
+			}
+		}
+
+		if (itemNames?.length) {
+			for (const itemName of itemNames) {
+				const items = await db
+					.select({ item: shoppingListItems, list: shoppingLists })
+					.from(shoppingListItems)
+					.innerJoin(shoppingLists, eq(shoppingListItems.listId, shoppingLists.id))
+					.where(
+						and(
+							eq(shoppingLists.userId, ctx.userId),
+							like(shoppingListItems.name, `%${itemName}%`),
+							listName ? eq(shoppingLists.name, listName) : undefined
+						)
+					);
+
+				for (const item of items) {
+					await db.delete(shoppingListItems).where(eq(shoppingListItems.id, item.item.id));
+					removed.push({ id: item.item.id, name: item.item.name });
+				}
+			}
+		}
+
+		return {
+			success: true,
+			removedCount: removed.length,
+			removed
+		};
+	}
+});
+
+export const markShoppingItemsBought = tool({
+	description: `Mark shopping list items as bought and optionally add them to the pantry. Use this when:
+- User says they bought items from their list
+- User completed their shopping trip
+- Moving purchased items to pantry inventory`,
+	inputSchema: z.object({
+		itemIds: z.array(z.string()).describe('IDs of items to mark as bought'),
+		addToPantry: z
+			.boolean()
+			.default(true)
+			.describe('Whether to add bought items to the pantry (default: true)')
+	}),
+	execute: async (input, { experimental_context: context }) => {
+		const ctx = getToolContext(context);
+		const { itemIds, addToPantry } = input;
+
+		if (itemIds.length === 0) {
+			return { success: false, error: 'No items provided' };
+		}
+
+		const items = await db
+			.select({ item: shoppingListItems, list: shoppingLists })
+			.from(shoppingListItems)
+			.innerJoin(shoppingLists, eq(shoppingListItems.listId, shoppingLists.id))
+			.where(eq(shoppingLists.userId, ctx.userId));
+
+		const validItems = items.filter((i) => itemIds.includes(i.item.id));
+
+		if (validItems.length === 0) {
+			return { success: false, error: 'No valid items found' };
+		}
+
+		await Promise.all(
+			validItems.map((i) =>
+				db
+					.update(shoppingListItems)
+					.set({ checked: true, updatedAt: new Date() })
+					.where(eq(shoppingListItems.id, i.item.id))
+			)
+		);
+
+		let addedToPantry = 0;
+		if (addToPantry) {
+			await db.insert(pantryItems).values(
+				validItems.map((i) => ({
+					userId: ctx.userId,
+					name: i.item.name,
+					category: i.item.category,
+					quantity: i.item.quantity,
+					unit: i.item.unit
+				}))
+			);
+			addedToPantry = validItems.length;
+		}
+
+		return {
+			success: true,
+			markedBought: validItems.length,
+			addedToPantry,
+			items: validItems.map((i) => ({ id: i.item.id, name: i.item.name }))
+		};
+	}
+});
+
 export const assistantTools = {
 	suggestFood,
 	managePreference,
@@ -905,5 +1243,10 @@ export const assistantTools = {
 	deleteMeal,
 	editMeal,
 	queryPantry,
-	managePantryItem
+	managePantryItem,
+	queryShoppingLists,
+	manageShoppingList,
+	addToShoppingList,
+	removeFromShoppingList,
+	markShoppingItemsBought
 };

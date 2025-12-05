@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { FoodAssistantDialog, GoalsDialog, PantryDialog } from '$lib/components/dialog';
+	import { FoodAssistantDialog, GoalsDialog, InventoryDialog } from '$lib/components/dialog';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
@@ -22,7 +22,7 @@
 
 	let goalsOpen = $state(false);
 	let assistantOpen = $state(false);
-	let pantryOpen = $state(false);
+	let inventoryOpen = $state(false);
 
 	const trialDaysLeft = $derived.by(() => {
 		if (!trialEnd) return null;
@@ -63,7 +63,12 @@
 					>
 						<ChefHatIcon class="size-4 text-muted-foreground" />
 					</Button>
-					<Button variant="outline" size="icon" class="size-8" onclick={() => (pantryOpen = true)}>
+					<Button
+						variant="outline"
+						size="icon"
+						class="size-8"
+						onclick={() => (inventoryOpen = true)}
+					>
 						<RefrigeratorIcon class="size-4 text-muted-foreground" />
 					</Button>
 					<Button variant="outline" size="icon" class="size-8" href={resolve('/progress')}>
@@ -82,6 +87,6 @@
 {#if assistantOpen && selectedDate}
 	<FoodAssistantDialog bind:open={assistantOpen} date={selectedDate} />
 {/if}
-{#if pantryOpen}
-	<PantryDialog bind:open={pantryOpen} />
+{#if inventoryOpen}
+	<InventoryDialog bind:open={inventoryOpen} />
 {/if}

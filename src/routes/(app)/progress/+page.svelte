@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { BmiCard } from '$lib/components/bmi-card';
 	import { CaloriesChart } from '$lib/components/calories-chart';
 	import { StreakCard } from '$lib/components/streak-card';
 	import { Button } from '$lib/components/ui/button';
@@ -28,6 +29,7 @@
 		<div class="flex-1 overflow-y-auto px-6 pb-20 no-scrollbar">
 			<div class="flex flex-col gap-4 py-4">
 				<StreakCard />
+				<BmiCard />
 				<CaloriesChart />
 				<WeightChart />
 			</div>

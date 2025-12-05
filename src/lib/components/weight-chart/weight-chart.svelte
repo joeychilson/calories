@@ -20,11 +20,13 @@
 
 	const chartData = $derived.by(() => {
 		if (!weightLogs || weightLogs.length === 0) return [];
-		return [...weightLogs].reverse().map((log) => {
-			const d = new SvelteDate(log.timestamp);
-			const date = new SvelteDate(d.getFullYear(), d.getMonth(), d.getDate());
-			return { date, weight: log.weight };
-		});
+		return [...weightLogs]
+			.sort((a, b) => a.date.localeCompare(b.date))
+			.map((log) => {
+				const [year, month, day] = log.date.split('-').map(Number);
+				const date = new SvelteDate(year, month - 1, day);
+				return { date, weight: log.weight };
+			});
 	});
 
 	const weightChange = $derived.by(() => {

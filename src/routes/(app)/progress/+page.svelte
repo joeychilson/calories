@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CaloriesChart } from '$lib/components/calories-chart';
 	import { StreakCard } from '$lib/components/streak-card';
 	import { Button } from '$lib/components/ui/button';
 	import { WeightChart } from '$lib/components/weight-chart';
@@ -24,10 +25,10 @@
 			</Button>
 			<h1 class="text-lg font-bold">Progress</h1>
 		</header>
-
 		<div class="flex-1 overflow-y-auto px-6 pb-20 no-scrollbar">
 			<div class="flex flex-col gap-4 py-4">
 				<StreakCard />
+				<CaloriesChart />
 				<WeightChart />
 			</div>
 		</div>

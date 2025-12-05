@@ -54,7 +54,6 @@
 			carbs: meal.carbs ?? undefined,
 			fat: meal.fat ?? undefined
 		});
-		toast.success(`Logged ${meal.name}`);
 		open = false;
 	}
 

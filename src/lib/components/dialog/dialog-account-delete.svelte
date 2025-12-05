@@ -24,7 +24,6 @@
 		isDeleting = true;
 		try {
 			await client.deleteUser();
-			toast.success('Account deleted successfully');
 			goto(resolve('/'));
 		} catch (error) {
 			toast.error('Failed to delete account');

@@ -9,8 +9,8 @@
 	import { getDeviceInfo } from '$lib/utils/device';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import AlertTriangleIcon from '@lucide/svelte/icons/alert-triangle';
-	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import TrashIcon from '@lucide/svelte/icons/trash';
@@ -60,7 +60,6 @@
 			await client.revokeSession({ token: sessionToken });
 			sessions = sessions?.filter((s) => s.id !== sessionId) ?? [];
 			await getSessions().refresh();
-			toast.success('Session revoked');
 		} catch {
 			toast.error('Unable to revoke session');
 		} finally {

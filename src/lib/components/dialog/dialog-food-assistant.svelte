@@ -263,7 +263,6 @@
 
 		try {
 			await addMeal({ ...meal, servings: meal.servings ?? 1, date, loggedAt }).updates(getMeals());
-			toast.success(`Logged ${meal.name}`);
 		} catch {
 			toast.error('Failed to log meal');
 		}

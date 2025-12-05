@@ -16,7 +16,6 @@
 	import UserIcon from '@lucide/svelte/icons/user';
 	import type { User } from 'better-auth';
 	import { mode, setMode } from 'mode-watcher';
-	import { toast } from 'svelte-sonner';
 
 	let { user, onGoalsClick }: { user: User; onGoalsClick?: () => void } = $props();
 </script>
@@ -68,7 +67,6 @@
 			onclick={async () => {
 				await signOut();
 				goto(resolve('/signin'), { invalidateAll: true });
-				toast.success('Goodbye! Hope to see you back soon!');
 			}}
 		>
 			<LogOutIcon class="size-4" />

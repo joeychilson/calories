@@ -29,11 +29,12 @@
 	}
 
 	const features = [
-		'Unlimited AI meal analysis',
-		'Photo-based calorie tracking',
-		'Personal AI nutrition assistant',
-		'Weight tracking & goals',
-		'Preference learning',
+		'Log meals by photo or text',
+		'Personal food assistant',
+		'Calorie & macro tracking',
+		'Weight & water tracking',
+		'Pantry & shopping lists',
+		'Progress charts & streaks',
 		'7-day free trial'
 	];
 </script>
@@ -55,7 +56,7 @@
 				</div>
 				<div class="space-y-1 text-center">
 					<h1 class="text-2xl font-bold tracking-tight">Calories</h1>
-					<p class="text-sm text-muted-foreground">Track your nutrition simply</p>
+					<p class="text-sm text-muted-foreground">Track your food and nutrition, simply</p>
 				</div>
 			</a>
 			<div
@@ -67,7 +68,7 @@
 						<span class="text-4xl font-bold">$3</span>
 						<span class="text-muted-foreground">/month</span>
 					</div>
-					<p class="text-xs text-muted-foreground">7-day free trial. Cancel anytime.</p>
+					<p class="text-xs text-muted-foreground">Try free for 7 days</p>
 				</div>
 				<div class="space-y-3">
 					{#each features as feature (feature)}

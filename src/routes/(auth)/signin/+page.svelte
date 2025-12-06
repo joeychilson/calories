@@ -26,7 +26,7 @@
 	<title>Sign In - Calories</title>
 	<meta
 		name="description"
-		content="Sign in to Calories to track your daily calories, meals, water intake, and weight goals with AI-powered nutrition tracking."
+		content="Sign in to Calories to track your meals, calories, macros, weight, and water—all in one place."
 	/>
 	<meta name="robots" content="noindex" />
 </svelte:head>
@@ -42,7 +42,7 @@
 				</div>
 				<div class="text-center space-y-1">
 					<h1 class="text-2xl font-bold tracking-tight">Calories</h1>
-					<p class="text-sm text-muted-foreground">Track your nutrition simply</p>
+					<p class="text-sm text-muted-foreground">Track your food and nutrition, simply</p>
 				</div>
 			</a>
 			<div

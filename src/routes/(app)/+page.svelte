@@ -36,7 +36,7 @@
 	<title>Calories</title>
 	<meta
 		name="description"
-		content="Calories is a simple app to help you track your calories and progress."
+		content="Track your meals, calories, macros, weight, and water—all in one place."
 	/>
 	<meta name="robots" content="noindex" />
 </svelte:head>

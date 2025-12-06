@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { FoodAssistantDialog, GoalsDialog, InventoryDialog } from '$lib/components/dialog';
+	import {
+		FoodAssistantDialog,
+		GoalsDialog,
+		InventoryDialog,
+		ProfileDialog
+	} from '$lib/components/dialog';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
@@ -21,6 +26,7 @@
 	} = $props();
 
 	let goalsOpen = $state(false);
+	let profileOpen = $state(false);
 	let assistantOpen = $state(false);
 	let inventoryOpen = $state(false);
 
@@ -75,7 +81,11 @@
 						<ChartLineIcon class="size-4 text-muted-foreground" />
 					</Button>
 				{/if}
-				<HeaderUserMenu {user} onGoalsClick={() => (goalsOpen = true)} />
+				<HeaderUserMenu
+					{user}
+					onGoalsClick={() => (goalsOpen = true)}
+					onProfileClick={() => (profileOpen = true)}
+				/>
 			</div>
 		{/if}
 	</div>
@@ -83,6 +93,9 @@
 
 {#if goalsOpen}
 	<GoalsDialog bind:open={goalsOpen} />
+{/if}
+{#if profileOpen}
+	<ProfileDialog bind:open={profileOpen} />
 {/if}
 {#if assistantOpen && selectedDate}
 	<FoodAssistantDialog bind:open={assistantOpen} date={selectedDate} />

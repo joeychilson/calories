@@ -13,6 +13,15 @@
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
 	import { completeOnboarding } from '$lib/remote/profile.remote';
 	import { markOnboardingComplete } from '$lib/remote/subscriptions.remote';
+	import {
+		calculateBMR,
+		calculateCalorieGoal,
+		calculateTDEE,
+		calculateWaterGoal,
+		inchesToCm,
+		kgToLbs,
+		lbsToKg
+	} from '$lib/utils/calculations';
 	import { formatDate } from '$lib/utils/format';
 	import {
 		CalendarDate,
@@ -55,15 +64,7 @@
 		{ value: 'very_active', label: 'Extra Active', desc: 'Very hard exercise & physical job' }
 	] as const;
 
-	const activityMultipliers: Record<typeof activityLevel, number> = {
-		sedentary: 1.2,
-		light: 1.375,
-		moderate: 1.55,
-		active: 1.725,
-		very_active: 1.9
-	};
-
-	function calculateAge(birthDate: DateValue | undefined): number {
+	function calculateAgeFromDateValue(birthDate: DateValue | undefined): number {
 		if (!birthDate) return 30;
 		const todayDate = today(getLocalTimeZone());
 		let age = todayDate.year - birthDate.year;
@@ -80,72 +81,36 @@
 		if (units === 'metric') {
 			return parseFloat(height) || 0;
 		}
-		const feet = parseFloat(heightFeet) || 0;
-		const inches = parseFloat(heightInches) || 0;
-		return (feet * 12 + inches) * 2.54;
+		return inchesToCm(parseFloat(heightFeet) || 0, parseFloat(heightInches) || 0);
 	}
 
 	function getWeightInKg(weightValue: string): number {
 		const w = parseFloat(weightValue) || 0;
-		if (units === 'metric') {
-			return w;
-		}
-		return w * 0.453592;
+		return units === 'metric' ? w : lbsToKg(w);
 	}
 
-	function calculateBMR(): number {
+	function getComputedCalorieGoal(): number {
 		const heightCm = getHeightInCm();
 		const weightKg = getWeightInKg(currentWeight);
-		const age = calculateAge(birthDateValue);
+		const age = calculateAgeFromDateValue(birthDateValue);
 
-		if (!heightCm || !weightKg) return 0;
-
-		if (sex === 'male') {
-			return 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
-		} else if (sex === 'female') {
-			return 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
-		}
-		return 10 * weightKg + 6.25 * heightCm - 5 * age - 78;
-	}
-
-	function calculateTDEE(): number {
-		const bmr = calculateBMR();
-		return Math.round(bmr * activityMultipliers[activityLevel]);
-	}
-
-	function calculateCalorieGoal(): number {
-		const tdee = calculateTDEE();
-		if (!tdee) return 2000;
+		const bmr = calculateBMR(heightCm, weightKg, age, sex || null);
+		const tdee = calculateTDEE(bmr, activityLevel);
 
 		const current = parseFloat(currentWeight) || 0;
 		const goal = parseFloat(goalWeight) || 0;
 
-		if (goal && current) {
-			if (goal < current) {
-				return Math.max(1200, tdee - 500);
-			} else if (goal > current) {
-				return tdee + 500;
-			}
-		}
-		return tdee;
+		return calculateCalorieGoal(tdee, current, goal || null);
 	}
 
-	function calculateWaterGoal(): number {
-		const weightLbs =
-			units === 'imperial'
-				? parseFloat(currentWeight) || 150
-				: (parseFloat(currentWeight) || 70) * 2.205;
-
-		const ozGoal = Math.max(64, Math.round(weightLbs * 0.5));
-
-		if (units === 'metric') {
-			return Math.round((ozGoal * 29.5735) / 100) * 100;
-		}
-		return ozGoal;
+	function getComputedWaterGoal(): number {
+		const weight = parseFloat(currentWeight) || (units === 'imperial' ? 150 : 70);
+		const weightLbs = units === 'imperial' ? weight : kgToLbs(weight);
+		return calculateWaterGoal(weightLbs, units);
 	}
 
-	let calculatedCalories = $derived(calculateCalorieGoal());
-	let calculatedWater = $derived(calculateWaterGoal());
+	let calculatedCalories = $derived(getComputedCalorieGoal());
+	let calculatedWater = $derived(getComputedWaterGoal());
 	let weightDiff = $derived(() => {
 		const current = parseFloat(currentWeight) || 0;
 		const goal = parseFloat(goalWeight) || 0;

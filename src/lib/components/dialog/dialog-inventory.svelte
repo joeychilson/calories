@@ -973,38 +973,38 @@
 								</SelectContent>
 							</Select>
 						</div>
-					<Button
-						variant="outline"
-						size="icon"
-						onclick={() => (shoppingView = 'add-list')}
-						aria-label="Create new list"
-					>
-						<PlusIcon class="size-4" />
-					</Button>
-					{#if selectedList}
 						<Button
 							variant="outline"
 							size="icon"
-							onclick={() => startEditingList(selectedList)}
-							aria-label="Edit list"
+							onclick={() => (shoppingView = 'add-list')}
+							aria-label="Create new list"
 						>
-							<PencilIcon class="size-4" />
+							<PlusIcon class="size-4" />
 						</Button>
-						<Button
-							variant="outline"
-							size="icon"
-							onclick={handleDownloadMarkdown}
-							aria-label="Download list"
-						>
-							<DownloadIcon class="size-4" />
+						{#if selectedList}
+							<Button
+								variant="outline"
+								size="icon"
+								onclick={() => startEditingList(selectedList)}
+								aria-label="Edit list"
+							>
+								<PencilIcon class="size-4" />
+							</Button>
+							<Button
+								variant="outline"
+								size="icon"
+								onclick={handleDownloadMarkdown}
+								aria-label="Download list"
+							>
+								<DownloadIcon class="size-4" />
+							</Button>
+						{/if}
+					{:else}
+						<Button variant="outline" class="flex-1" onclick={() => (shoppingView = 'add-list')}>
+							<PlusIcon class="size-4 mr-2" />
+							Create List
 						</Button>
 					{/if}
-				{:else}
-					<Button variant="outline" class="flex-1" onclick={() => (shoppingView = 'add-list')}>
-						<PlusIcon class="size-4 mr-2" />
-						Create List
-					</Button>
-				{/if}
 				</div>
 
 				{#if !selectedList}

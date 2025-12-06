@@ -94,7 +94,12 @@
 				</div>
 			</DrawerHeader>
 
-			<div class={cn('flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6 mx-auto w-full', contentClass)}>
+			<div
+				class={cn(
+					'flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6 mx-auto w-full',
+					contentClass
+				)}
+			>
 				{@render children()}
 			</div>
 		</DrawerContent>

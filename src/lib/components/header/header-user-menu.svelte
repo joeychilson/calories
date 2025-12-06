@@ -14,10 +14,15 @@
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import UserIcon from '@lucide/svelte/icons/user';
+	import UserCogIcon from '@lucide/svelte/icons/user-cog';
 	import type { User } from 'better-auth';
 	import { mode, setMode } from 'mode-watcher';
 
-	let { user, onGoalsClick }: { user: User; onGoalsClick?: () => void } = $props();
+	let {
+		user,
+		onGoalsClick,
+		onProfileClick
+	}: { user: User; onGoalsClick?: () => void; onProfileClick?: () => void } = $props();
 </script>
 
 <DropdownMenu>
@@ -41,6 +46,10 @@
 		<DropdownMenuItem onclick={onGoalsClick}>
 			<GoalIcon class="size-4" />
 			<span>Goals</span>
+		</DropdownMenuItem>
+		<DropdownMenuItem onclick={onProfileClick}>
+			<UserCogIcon class="size-4" />
+			<span>Profile</span>
 		</DropdownMenuItem>
 		<DropdownMenuItem onclick={() => goto(resolve('/account'))}>
 			<UserIcon class="size-4" />

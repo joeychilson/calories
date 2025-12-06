@@ -45,9 +45,21 @@ interface ErrorLogData {
 
 export function logError(data: ErrorLogData): void {
 	const { error: err, ...rest } = data;
+	let errorMessage: string;
+	let stack: string | undefined;
+
+	if (err instanceof Error) {
+		errorMessage = err.message;
+		stack = err.stack;
+	} else if (err && typeof err === 'object') {
+		errorMessage = JSON.stringify(err);
+	} else {
+		errorMessage = String(err);
+	}
+
 	logger.error('request_error', {
 		...rest,
-		error: err instanceof Error ? err.message : String(err),
-		stack: err instanceof Error ? err.stack : undefined
+		error: errorMessage,
+		stack
 	});
 }

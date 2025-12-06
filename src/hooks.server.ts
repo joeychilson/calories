@@ -1,7 +1,7 @@
 import { building } from '$app/environment';
 import { auth } from '$lib/server/auth';
 import { generateRequestId, logError, logRequest } from '$lib/server/logger';
-import { type Handle, redirect } from '@sveltejs/kit';
+import { type Handle, isHttpError, isRedirect, redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 
@@ -26,6 +26,10 @@ const loggingHandler: Handle = async ({ event, resolve }) => {
 
 		return response;
 	} catch (error) {
+		if (isRedirect(error) || isHttpError(error)) {
+			throw error;
+		}
+
 		const duration = Date.now() - start;
 
 		logError({

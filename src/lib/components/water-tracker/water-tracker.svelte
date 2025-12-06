@@ -47,14 +47,14 @@
 				cy="20"
 				r="16"
 				fill="none"
-				class="stroke-blue-500 transition-all duration-300"
+				class="stroke-secondary transition-all duration-300"
 				stroke-width="3"
 				stroke-linecap="round"
 				stroke-dasharray={2 * Math.PI * 16}
 				stroke-dashoffset={2 * Math.PI * 16 * (1 - waterPercent / 100)}
 			/>
 		</svg>
-		<DropletIcon class="absolute inset-0 m-auto size-5 text-blue-500" />
+		<DropletIcon class="absolute inset-0 m-auto size-5 text-secondary" />
 	</div>
 	<div class="min-w-0 flex-1">
 		<div class="flex items-baseline gap-1">

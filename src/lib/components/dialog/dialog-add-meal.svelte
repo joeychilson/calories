@@ -17,7 +17,7 @@
 	} from '$lib/remote/meals.remote';
 	import type { MealInput } from '$lib/types';
 	import AlignLeftIcon from '@lucide/svelte/icons/align-left';
-	import CameraIcon from '@lucide/svelte/icons/camera';
+	import ScanIcon from '@lucide/svelte/icons/scan';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import HistoryIcon from '@lucide/svelte/icons/history';
@@ -340,7 +340,7 @@
 						onclick={() => selectMode('camera')}
 					>
 						<div class="rounded-lg bg-muted p-2">
-							<CameraIcon class="size-5 text-muted-foreground" />
+							<ScanIcon class="size-5 text-muted-foreground" />
 						</div>
 						<div class="flex-1">
 							<p class="font-medium">Scan a photo</p>

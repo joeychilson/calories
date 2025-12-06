@@ -418,3 +418,119 @@ export async function analyzePantryImage(
 
 	return output;
 }
+
+const shoppingListItemSchema = z.object({
+	name: z.string().describe('The name of the item to buy'),
+	category: z
+		.enum(['protein', 'vegetable', 'fruit', 'dairy', 'grain', 'pantry', 'beverage', 'other'])
+		.describe('Category of the food item'),
+	quantity: z.number().optional().describe('Quantity if specified'),
+	unit: z.string().optional().describe('Unit if specified (lbs, oz, count, etc.)')
+});
+
+const shoppingListAnalysisSchema = z.object({
+	isValid: z.boolean().describe('Whether the input contains a valid shopping list'),
+	rejectionReason: z.string().optional().describe('If invalid, explain why'),
+	items: z.array(shoppingListItemSchema).describe('List of items to buy')
+});
+
+export type ShoppingListAnalysis = z.infer<typeof shoppingListAnalysisSchema>;
+export type ShoppingListItem = z.infer<typeof shoppingListItemSchema>;
+
+const SHOPPING_LIST_SCAN_PROMPT = `<role>
+You are an expert at parsing shopping lists from various formats - handwritten notes, screenshots, text files, and images.
+</role>
+
+<task>
+Extract shopping list items from the input. Handle various formats:
+1. HANDWRITTEN LISTS - Read handwritten shopping notes
+2. SCREENSHOTS - Parse screenshots of lists from apps, notes, messages
+3. TEXT - Parse plain text lists in any format (bullets, dashes, numbered, comma-separated, one per line)
+4. IMAGES - Photos of printed or typed lists
+</task>
+
+<validation>
+FIRST, determine if the input contains shopping list items:
+- VALID: Contains food/grocery items to buy
+- INVALID: Not a shopping list (random text, non-food images, unreadable)
+</validation>
+
+<parsing_rules>
+COMMON FORMATS:
+- "milk, eggs, bread" → 3 items
+- "- chicken\\n- rice\\n- broccoli" → 3 items
+- "1. Apples (6)\\n2. Bananas" → 2 items
+- "2 lbs ground beef" → quantity: 2, unit: "lbs", name: "Ground Beef"
+- "eggs x12" or "eggs (12)" → quantity: 12, unit: "count", name: "Eggs"
+- "butter 2 sticks" → quantity: 2, unit: "sticks", name: "Butter"
+
+QUANTITY EXTRACTION:
+- Look for numbers before or after item names
+- Common units: lbs, oz, count, pack, bag, box, can, bottle, dozen
+- If no quantity specified, omit quantity and unit fields
+
+NAME CLEANUP:
+- Capitalize properly: "chicken breast" → "Chicken Breast"
+- Expand abbreviations: "chix" → "Chicken", "tom" → "Tomatoes"
+- Remove list markers (bullets, dashes, numbers)
+- Clean up spacing and formatting
+</parsing_rules>
+
+<categorization>
+- protein: meat, poultry, fish, seafood, eggs, tofu, tempeh
+- vegetable: fresh, frozen, or canned vegetables
+- fruit: fresh, frozen, or canned fruits
+- dairy: milk, cheese, yogurt, butter, cream
+- grain: bread, pasta, rice, cereal, flour, oats
+- pantry: canned goods, condiments, oils, spices, snacks, baking items
+- beverage: drinks, juice, coffee, tea, soda, water
+- other: non-food items or unclear
+</categorization>`;
+
+export async function analyzeShoppingList(
+	input: { type: 'image'; base64Data: string; mimeType: string } | { type: 'text'; content: string }
+): Promise<ShoppingListAnalysis> {
+	const userContent =
+		input.type === 'image'
+			? [
+					{
+						type: 'text' as const,
+						text: 'Extract all shopping list items from this image. Parse any handwritten or typed text visible.'
+					},
+					{ type: 'image' as const, image: input.base64Data, mediaType: input.mimeType }
+				]
+			: [
+					{
+						type: 'text' as const,
+						text: `Extract all shopping list items from this text:\n\n${input.content}`
+					}
+				];
+
+	const { output } = await generateText({
+		model: gateway('google/gemini-3-pro-preview'),
+		providerOptions: {
+			google: { thinkingConfig: { thinkingLevel: 'high' } }
+		},
+		output: Output.object({ schema: shoppingListAnalysisSchema }),
+		messages: [
+			{
+				role: 'system',
+				content: SHOPPING_LIST_SCAN_PROMPT
+			},
+			{
+				role: 'user',
+				content: userContent
+			}
+		]
+	});
+
+	if (!output.isValid) {
+		return {
+			isValid: false,
+			rejectionReason: output.rejectionReason || 'Could not parse shopping list from input.',
+			items: []
+		};
+	}
+
+	return output;
+}

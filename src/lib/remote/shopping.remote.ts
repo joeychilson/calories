@@ -1,12 +1,21 @@
 import { command, getRequestEvent, query } from '$app/server';
 import { PANTRY_CATEGORY_LABELS, PANTRY_CATEGORY_ORDER } from '$lib/constants';
+import { MIME_TO_EXT } from '$lib/constants/mime';
+import { analyzeShoppingList } from '$lib/server/ai';
 import { db } from '$lib/server/db';
+import { aiLimiter } from '$lib/server/ratelimit';
 import {
 	pantryCategoryValues,
 	pantryItems,
 	shoppingListItems,
 	shoppingLists
 } from '$lib/server/schema';
+import {
+	deleteImage,
+	getImageBuffer,
+	getPresignedUploadUrl,
+	imageExists
+} from '$lib/server/storage';
 import { error } from '@sveltejs/kit';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -509,3 +518,121 @@ export const getShoppingListMarkdown = command(z.string().uuid(), async (listId)
 
 	return { markdown, name: list.name };
 });
+
+export const getShoppingListImageUploadUrl = command(
+	z.object({ mimeType: z.string() }),
+	async (input) => {
+		const { locals } = getRequestEvent();
+		if (!locals.session || !locals.user) {
+			return error(401, 'Unauthorized');
+		}
+
+		const ext = MIME_TO_EXT[input.mimeType] || 'jpg';
+		const timestamp = Date.now();
+		const imageKey = `temp/${locals.user.id}/shopping-${timestamp}.${ext}`;
+		const uploadUrl = getPresignedUploadUrl(imageKey);
+
+		return { imageKey, uploadUrl };
+	}
+);
+
+const MAX_TEXT_FILE_SIZE = 50 * 1024; // 50KB
+const MAX_LINE_COUNT = 200;
+
+export const scanShoppingList = command(
+	z.union([
+		z.object({
+			type: z.literal('image'),
+			imageKey: z.string(),
+			mimeType: z.string().default('image/jpeg')
+		}),
+		z.object({
+			type: z.literal('text'),
+			content: z.string()
+		})
+	]),
+	async (input) => {
+		const event = getRequestEvent();
+		if (!event.locals.session || !event.locals.user) {
+			return error(401, 'Unauthorized');
+		}
+
+		if (await aiLimiter.isLimited(event)) {
+			return error(429, 'Too many requests. Please try again later.');
+		}
+
+		if (input.type === 'image') {
+			if (!input.imageKey.startsWith(`temp/${event.locals.user.id}/`)) {
+				return error(403, 'Invalid image key');
+			}
+
+			try {
+				const exists = await imageExists(input.imageKey);
+				if (!exists) {
+					return error(404, 'Image not found. Please try uploading again.');
+				}
+
+				const imageBuffer = await getImageBuffer(input.imageKey);
+				const base64Data = imageBuffer.toString('base64');
+
+				const analysis = await analyzeShoppingList({
+					type: 'image',
+					base64Data,
+					mimeType: input.mimeType
+				});
+
+				await deleteImage(input.imageKey);
+
+				if (!analysis.isValid) {
+					return error(
+						400,
+						analysis.rejectionReason || 'Could not parse shopping list from image.'
+					);
+				}
+
+				return { items: analysis.items };
+			} catch (err) {
+				console.error('Shopping list image analysis failed:', err);
+				return error(500, 'Failed to analyze image. Please try again.');
+			}
+		} else {
+			const content = input.content;
+
+			const byteSize = new TextEncoder().encode(content).length;
+			if (byteSize > MAX_TEXT_FILE_SIZE) {
+				return error(400, 'File is too large. Please use a file under 50KB.');
+			}
+
+			let lines = content.split('\n');
+			let truncated = false;
+			if (lines.length > MAX_LINE_COUNT) {
+				lines = lines.slice(0, MAX_LINE_COUNT);
+				truncated = true;
+			}
+
+			const truncatedContent = lines.join('\n');
+
+			try {
+				const analysis = await analyzeShoppingList({
+					type: 'text',
+					content: truncatedContent
+				});
+
+				if (!analysis.isValid) {
+					return error(400, analysis.rejectionReason || 'Could not parse shopping list from text.');
+				}
+
+				return {
+					items: analysis.items,
+					truncated,
+					truncatedMessage: truncated
+						? `List truncated to first ${MAX_LINE_COUNT} items`
+						: undefined
+				};
+			} catch (err) {
+				console.error('Shopping list text analysis failed:', err);
+				return error(500, 'Failed to analyze text. Please try again.');
+			}
+		}
+	}
+);

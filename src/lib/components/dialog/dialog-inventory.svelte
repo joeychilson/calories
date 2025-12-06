@@ -15,19 +15,21 @@
 	} from '$lib/remote/pantry.remote';
 	import {
 		addShoppingListItem,
+		addShoppingListItems,
 		clearCheckedItems,
 		createShoppingList,
 		deleteShoppingList,
 		deleteShoppingListItem,
+		getShoppingListImageUploadUrl,
 		getShoppingListMarkdown,
 		getShoppingLists,
 		markItemsBoughtAndAddToPantry,
+		scanShoppingList,
 		toggleShoppingListItem,
 		updateShoppingList,
 		updateShoppingListItem
 	} from '$lib/remote/shopping.remote';
 	import { type PantryCategory } from '$lib/server/schema';
-	import CameraIcon from '@lucide/svelte/icons/camera';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import DownloadIcon from '@lucide/svelte/icons/download';
@@ -35,6 +37,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import RefrigeratorIcon from '@lucide/svelte/icons/refrigerator';
+	import ScanIcon from '@lucide/svelte/icons/scan';
 	import ShoppingCartIcon from '@lucide/svelte/icons/shopping-cart';
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
 	import { toast } from 'svelte-sonner';
@@ -54,6 +57,14 @@
 	};
 
 	type ParsedReceiptItem = {
+		name: string;
+		category?: PantryCategory;
+		quantity?: number;
+		unit?: string;
+		selected: boolean;
+	};
+
+	type ParsedShoppingItem = {
 		name: string;
 		category?: PantryCategory;
 		quantity?: number;
@@ -86,7 +97,7 @@
 	const shoppingLists = $derived(getShoppingLists().current ?? initialShoppingLists);
 
 	let pantryView = $state<'list' | 'add' | 'receipt-review'>('list');
-	let shoppingView = $state<'list' | 'add-item' | 'add-list' | 'edit-list'>('list');
+	let shoppingView = $state<'list' | 'add-item' | 'add-list' | 'edit-list' | 'scan-review'>('list');
 
 	let newName = $state('');
 	let newCategory = $state<PantryCategory | ''>('');
@@ -99,6 +110,11 @@
 	let analyzing = $state(false);
 	let parsedItems = $state<ParsedReceiptItem[]>([]);
 	let storeName = $state<string | null>(null);
+
+	let shoppingScanInput = $state<HTMLInputElement | null>(null);
+	let shoppingAnalyzing = $state(false);
+	let parsedShoppingItems = $state<ParsedShoppingItem[]>([]);
+	let shoppingTruncatedMessage = $state<string | null>(null);
 
 	let selectedListId = $state<string | undefined>(undefined);
 	let newListName = $state('');
@@ -160,6 +176,7 @@
 			if (shoppingView === 'add-item') return editingItemId ? 'Edit Item' : 'Add to List';
 			if (shoppingView === 'add-list') return 'New List';
 			if (shoppingView === 'edit-list') return 'Edit List';
+			if (shoppingView === 'scan-review') return 'Review Items';
 			return 'Shopping';
 		}
 	});
@@ -170,8 +187,11 @@
 			if (pantryView === 'list') return 'What you have on hand';
 			return undefined;
 		}
-		if (activeTab === 'shopping' && shoppingView === 'list') {
-			return 'What you need to buy';
+		if (activeTab === 'shopping') {
+			if (shoppingView === 'list') return 'What you need to buy';
+			if (shoppingView === 'scan-review' && shoppingTruncatedMessage)
+				return shoppingTruncatedMessage;
+			return undefined;
 		}
 		return undefined;
 	});
@@ -191,6 +211,8 @@
 		storeName = null;
 		newListName = '';
 		editingListId = null;
+		parsedShoppingItems = [];
+		shoppingTruncatedMessage = null;
 	}
 
 	function goToList() {
@@ -341,6 +363,136 @@
 		parsedItems = parsedItems.map((item) => ({ ...item, selected: false }));
 	}
 
+	const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15MB
+	const MAX_TEXT_SIZE = 50 * 1024; // 50KB
+	const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+	const TEXT_TYPES = ['text/plain', 'text/markdown'];
+
+	async function handleShoppingScan(e: Event) {
+		const target = e.target as HTMLInputElement;
+		if (!target.files || !target.files[0]) return;
+
+		const file = target.files[0];
+		const isImage =
+			IMAGE_TYPES.includes(file.type) || file.name.match(/\.(jpg|jpeg|png|webp|heic)$/i);
+		const isText = TEXT_TYPES.includes(file.type) || file.name.match(/\.(txt|md)$/i);
+
+		if (!isImage && !isText) {
+			toast.error('Please select an image (jpg, png, webp) or text file (.txt, .md)');
+			return;
+		}
+
+		if (isImage && file.size > MAX_IMAGE_SIZE) {
+			toast.error('Image is too large. Please use an image under 15MB.');
+			return;
+		}
+
+		if (isText && file.size > MAX_TEXT_SIZE) {
+			toast.error('File is too large. Please use a file under 50KB.');
+			return;
+		}
+
+		shoppingAnalyzing = true;
+
+		try {
+			if (isImage) {
+				const mimeType = file.type || 'image/jpeg';
+				const { imageKey, uploadUrl } = await getShoppingListImageUploadUrl({ mimeType });
+
+				const uploadResponse = await fetch(uploadUrl, {
+					method: 'PUT',
+					body: file,
+					headers: { 'Content-Type': mimeType }
+				});
+
+				if (!uploadResponse.ok) {
+					throw new Error('Failed to upload image');
+				}
+
+				const result = await scanShoppingList({ type: 'image', imageKey, mimeType });
+
+				parsedShoppingItems = result.items.map((item) => ({
+					...item,
+					selected: true
+				}));
+
+				if (parsedShoppingItems.length === 0) {
+					toast.error('No items found in the image');
+					return;
+				}
+			} else {
+				const content = await file.text();
+				const result = await scanShoppingList({ type: 'text', content });
+
+				parsedShoppingItems = result.items.map((item) => ({
+					...item,
+					selected: true
+				}));
+
+				shoppingTruncatedMessage = result.truncatedMessage ?? null;
+
+				if (parsedShoppingItems.length === 0) {
+					toast.error('No items found in the file');
+					return;
+				}
+			}
+
+			shoppingView = 'scan-review';
+		} catch (err: unknown) {
+			console.error('Shopping scan failed:', err);
+			const message = err instanceof Error ? err.message : 'Failed to analyze file';
+			toast.error(message);
+		} finally {
+			shoppingAnalyzing = false;
+			if (shoppingScanInput) shoppingScanInput.value = '';
+		}
+	}
+
+	async function handleAddSelectedShoppingItems() {
+		if (!selectedList) {
+			toast.error('Please select a list first');
+			return;
+		}
+
+		const selected = parsedShoppingItems.filter((item) => item.selected);
+		if (selected.length === 0) {
+			toast.error('No items selected');
+			return;
+		}
+
+		saving = true;
+		try {
+			await addShoppingListItems({
+				listId: selectedList.id,
+				items: selected.map((item) => ({
+					name: item.name,
+					category: item.category,
+					quantity: item.quantity,
+					unit: item.unit
+				}))
+			}).updates(getShoppingLists());
+			toast.success(`Added ${selected.length} items to ${selectedList.name}`);
+			goToList();
+		} catch (err) {
+			console.error('Failed to add items:', err);
+			toast.error('Failed to add items');
+		} finally {
+			saving = false;
+		}
+	}
+
+	function toggleShoppingItemSelection(index: number) {
+		parsedShoppingItems[index].selected = !parsedShoppingItems[index].selected;
+	}
+
+	function selectAllShoppingItems() {
+		parsedShoppingItems = parsedShoppingItems.map((item) => ({ ...item, selected: true }));
+	}
+
+	function deselectAllShoppingItems() {
+		parsedShoppingItems = parsedShoppingItems.map((item) => ({ ...item, selected: false }));
+	}
+
 	function startEditingShoppingItem(item: ShoppingListItem) {
 		editingItemId = item.id;
 		newName = item.name;
@@ -405,6 +557,19 @@
 		}
 	}
 
+	async function handleUncheckAll() {
+		if (checkedItems.length === 0) return;
+
+		try {
+			await Promise.all(
+				checkedItems.map((item) => toggleShoppingListItem(item.id).updates(getShoppingLists()))
+			);
+		} catch (err) {
+			console.error('Failed to uncheck items:', err);
+			toast.error('Failed to uncheck items');
+		}
+	}
+
 	async function handleSaveList() {
 		if (!newListName.trim()) return;
 
@@ -431,8 +596,6 @@
 	}
 
 	async function handleDeleteList(id: string) {
-		if (!confirm('Delete this shopping list and all its items?')) return;
-
 		try {
 			await deleteShoppingList(id).updates(getShoppingLists());
 			if (selectedListId === id) {
@@ -453,7 +616,7 @@
 			const result = await markItemsBoughtAndAddToPantry({
 				itemIds: checkedItems.map((i) => i.id),
 				addToPantry: true
-			}).updates(getShoppingLists());
+			}).updates(getShoppingLists(), getPantryItems());
 
 			if (result.addedToPantry > 0) {
 				toast.success(`Added ${result.addedToPantry} items to pantry`);
@@ -467,17 +630,6 @@
 			toast.error('Failed to add items to pantry');
 		} finally {
 			saving = false;
-		}
-	}
-
-	async function handleClearChecked() {
-		if (!selectedList || checkedItems.length === 0) return;
-
-		try {
-			await clearCheckedItems(selectedList.id).updates(getShoppingLists());
-		} catch (err) {
-			console.error('Failed to clear items:', err);
-			toast.error('Failed to clear items');
 		}
 	}
 
@@ -594,7 +746,7 @@
 								<Loader2Icon class="size-4 mr-2 animate-spin" />
 								Scanning...
 							{:else}
-								<CameraIcon class="size-4 mr-2" />
+								<ScanIcon class="size-4 mr-2" />
 								Scan
 							{/if}
 						</Button>
@@ -870,10 +1022,34 @@
 						</Button>
 					</div>
 				{:else}
-					<Button variant="outline" class="w-full" onclick={() => (shoppingView = 'add-item')}>
-						<PlusIcon class="size-4 mr-2" />
-						Add Item
-					</Button>
+					<div class="flex gap-2">
+						<Button variant="outline" class="flex-1" onclick={() => (shoppingView = 'add-item')}>
+							<PlusIcon class="size-4 mr-2" />
+							Add Item
+						</Button>
+						<Button
+							variant="outline"
+							class="flex-1"
+							onclick={() => shoppingScanInput?.click()}
+							disabled={shoppingAnalyzing}
+						>
+							{#if shoppingAnalyzing}
+								<Loader2Icon class="size-4 mr-2 animate-spin" />
+								Scanning...
+							{:else}
+								<ScanIcon class="size-4 mr-2" />
+								Scan
+							{/if}
+						</Button>
+						<input
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/heic,.txt,.md,text/plain,text/markdown"
+							capture="environment"
+							bind:this={shoppingScanInput}
+							onchange={handleShoppingScan}
+							class="hidden"
+						/>
+					</div>
 					{#if selectedList.items.length === 0}
 						<div class="flex flex-col items-center justify-center py-8 text-center">
 							<p class="text-sm text-muted-foreground">This list is empty</p>
@@ -944,15 +1120,15 @@
 										<button
 											type="button"
 											class="text-xs text-muted-foreground hover:text-foreground"
-											onclick={handleClearChecked}
+											onclick={handleUncheckAll}
 										>
-											Clear
+											Uncheck all
 										</button>
 									</div>
 									<div class="rounded-lg border bg-card overflow-hidden divide-y opacity-60">
 										{#each checkedItems as item (item.id)}
 											<div
-												class="flex items-center gap-3 py-2 px-3 hover:bg-muted/30 transition-colors"
+												class="flex items-center gap-3 py-2.5 px-3 hover:bg-muted/30 transition-colors group"
 											>
 												<button
 													type="button"
@@ -965,6 +1141,14 @@
 												<span class="flex-1 line-through text-muted-foreground truncate">
 													{item.name}
 												</span>
+												<button
+													type="button"
+													class="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-destructive transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+													onclick={() => handleDeleteShoppingItem(item.id)}
+													aria-label="Delete {item.name}"
+												>
+													<TrashIcon class="size-4" />
+												</button>
 											</div>
 										{/each}
 									</div>
@@ -1092,6 +1276,75 @@
 						Delete List
 					</Button>
 				{/if}
+			</div>
+		{:else if shoppingView === 'scan-review'}
+			<div class="space-y-4">
+				<div class="flex items-center justify-between">
+					<span class="text-sm text-muted-foreground">
+						{parsedShoppingItems.filter((i) => i.selected).length} of {parsedShoppingItems.length} selected
+					</span>
+					<div class="flex gap-2">
+						<button
+							type="button"
+							class="text-xs text-primary hover:underline"
+							onclick={selectAllShoppingItems}
+						>
+							Select all
+						</button>
+						<button
+							type="button"
+							class="text-xs text-muted-foreground hover:underline"
+							onclick={deselectAllShoppingItems}
+						>
+							Clear
+						</button>
+					</div>
+				</div>
+
+				<div class="space-y-1 max-h-[350px] overflow-y-auto">
+					{#each parsedShoppingItems as item, index (index)}
+						<button
+							type="button"
+							class="w-full flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/50 text-left transition-colors {item.selected
+								? 'bg-primary/5'
+								: ''}"
+							onclick={() => toggleShoppingItemSelection(index)}
+						>
+							<div
+								class="size-5 rounded border-2 flex items-center justify-center transition-colors {item.selected
+									? 'bg-primary border-primary text-primary-foreground'
+									: 'border-muted-foreground/30'}"
+							>
+								{#if item.selected}
+									<CheckIcon class="size-3" />
+								{/if}
+							</div>
+							<div class="flex-1 min-w-0">
+								<div class="truncate font-medium">{item.name}</div>
+								<div class="text-xs text-muted-foreground">
+									{#if item.quantity && item.unit}
+										{item.quantity} {item.unit} ·
+									{/if}
+									{PANTRY_CATEGORY_LABELS[item.category ?? 'other']}
+								</div>
+							</div>
+						</button>
+					{/each}
+				</div>
+
+				<Button
+					onclick={handleAddSelectedShoppingItems}
+					disabled={parsedShoppingItems.filter((i) => i.selected).length === 0 || saving}
+					class="w-full"
+				>
+					{#if saving}
+						<Loader2Icon class="size-4 mr-2 animate-spin" />
+						Adding...
+					{:else}
+						<CheckIcon class="size-4 mr-2" />
+						Add {parsedShoppingItems.filter((i) => i.selected).length} Items
+					{/if}
+				</Button>
 			</div>
 		{/if}
 	</div>

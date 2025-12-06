@@ -31,7 +31,6 @@
 	} from '$lib/remote/shopping.remote';
 	import { type PantryCategory } from '$lib/server/schema';
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
@@ -471,7 +470,6 @@
 					unit: item.unit
 				}))
 			}).updates(getShoppingLists());
-			toast.success(`Added ${selected.length} items to ${selectedList.name}`);
 			goToList();
 		} catch (err) {
 			console.error('Failed to add items:', err);
@@ -617,10 +615,6 @@
 				itemIds: checkedItems.map((i) => i.id),
 				addToPantry: true
 			}).updates(getShoppingLists(), getPantryItems());
-
-			if (result.addedToPantry > 0) {
-				toast.success(`Added ${result.addedToPantry} items to pantry`);
-			}
 
 			if (selectedList) {
 				await clearCheckedItems(selectedList.id).updates(getShoppingLists());
@@ -786,7 +780,7 @@
 														<span class="font-medium truncate">{item.name}</span>
 														{#if item.quantity && item.unit}
 															<span
-																class="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded"
+																class="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0"
 															>
 																{item.quantity}
 																{item.unit}
@@ -971,7 +965,6 @@
 							<Select type="single" bind:value={selectedListId}>
 								<SelectTrigger class="w-full">
 									<span class="truncate">{selectedList?.name ?? 'Select list'}</span>
-									<ChevronDownIcon class="size-4 ml-auto opacity-50" />
 								</SelectTrigger>
 								<SelectContent>
 									{#each shoppingLists as list (list.id)}
@@ -1067,19 +1060,21 @@
 										<div class="rounded-lg border bg-card overflow-hidden divide-y">
 											{#each groupedUncheckedItems[category] as item (item.id)}
 												<div
-													class="flex items-center gap-3 py-2.5 px-3 hover:bg-muted/30 transition-colors group"
+													class="flex items-center justify-between py-2.5 px-3 hover:bg-muted/30 transition-colors group"
 												>
-													<button
-														type="button"
-														class="size-5 rounded border-2 flex items-center justify-center transition-colors border-muted-foreground/30 hover:border-primary"
-														onclick={() => handleToggleItem(item.id)}
-														aria-label="Mark {item.name} as bought"
-													>
-													</button>
-													<div class="flex-1 min-w-0">
-														<span class="font-medium truncate block">{item.name}</span>
+													<div class="flex items-center gap-3 min-w-0">
+														<button
+															type="button"
+															class="size-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors border-muted-foreground/30 hover:border-primary"
+															onclick={() => handleToggleItem(item.id)}
+															aria-label="Mark {item.name} as bought"
+														>
+														</button>
+														<span class="font-medium truncate">{item.name}</span>
 														{#if item.quantity && item.unit}
-															<span class="text-xs text-muted-foreground">
+															<span
+																class="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0"
+															>
 																{item.quantity}
 																{item.unit}
 															</span>

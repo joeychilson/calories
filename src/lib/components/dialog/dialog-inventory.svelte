@@ -677,7 +677,7 @@
 		{/if}
 	{/snippet}
 
-	<div class="py-4">
+	<div class="py-4 overflow-hidden">
 		{#if (activeTab === 'pantry' && pantryView === 'list') || (activeTab === 'shopping' && shoppingView === 'list')}
 			<div class="flex gap-1 p-1 bg-muted rounded-lg mb-4">
 				<button

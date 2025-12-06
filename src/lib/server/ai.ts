@@ -152,7 +152,7 @@ export async function analyzeMealFromImage(
 	mimeType: string
 ): Promise<MealAnalysis> {
 	const { output } = await generateText({
-		model: openrouter.chat('google/gemini-3-pro-preview'),
+		model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
 		providerOptions: {
 			openrouter: { provider: { sort: 'latency' }, reasoning: { enabled: true } }
 		},
@@ -247,7 +247,7 @@ WHEN UNCERTAIN: Estimate on the higher end. Users typically underreport.
 
 export async function analyzeMealFromText(description: string): Promise<MealAnalysis> {
 	const { output } = await generateText({
-		model: openrouter.chat('google/gemini-3-pro-preview'),
+		model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
 		providerOptions: {
 			openrouter: { provider: { sort: 'latency' }, reasoning: { enabled: true } }
 		},
@@ -385,7 +385,7 @@ export async function analyzePantryImage(
 	mimeType: string
 ): Promise<PantryImageAnalysis> {
 	const { output } = await generateText({
-		model: openrouter.chat('google/gemini-3-pro-preview'),
+		model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
 		providerOptions: {
 			openrouter: { provider: { sort: 'latency' }, reasoning: { enabled: true } }
 		},
@@ -507,7 +507,7 @@ export async function analyzeShoppingList(
 				];
 
 	const { output } = await generateText({
-		model: openrouter.chat('google/gemini-3-pro-preview'),
+		model: openrouter.chat('google/gemini-2.5-flash-preview-09-2025'),
 		providerOptions: {
 			openrouter: { provider: { sort: 'latency' }, reasoning: { enabled: true } }
 		},

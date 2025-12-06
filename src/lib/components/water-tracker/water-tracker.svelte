@@ -19,8 +19,7 @@
 	);
 	const useOz = $derived(profile?.units === 'imperial');
 	const waterUnit = $derived(useOz ? 'oz' : 'ml');
-	const waterSmallAmount = $derived(useOz ? 8 : 250);
-	const waterLargeAmount = $derived(useOz ? 16 : 500);
+	const waterIncrement = $derived(useOz ? 4 : 100);
 	const waterGoal = $derived(profile?.waterGoal ?? (useOz ? 64 : 2000));
 	const waterConsumed = $derived(waterData?.amount ?? 0);
 	const waterPercent = $derived(Math.min((waterConsumed / waterGoal) * 100, 100));
@@ -68,9 +67,9 @@
 	<div class="flex gap-1">
 		<Button
 			size="sm"
-			variant="ghost"
-			class="size-8 rounded-lg px-0 text-xs font-semibold text-muted-foreground hover:text-foreground"
-			onclick={() => addWater(-waterSmallAmount)}
+			variant="outline"
+			class="size-8 rounded-lg px-0 text-xs font-semibold"
+			onclick={() => addWater(-waterIncrement)}
 			disabled={waterConsumed === 0}
 		>
 			−
@@ -78,18 +77,10 @@
 		<Button
 			size="sm"
 			variant="outline"
-			class="h-8 rounded-lg px-2 text-xs font-semibold"
-			onclick={() => addWater(waterSmallAmount)}
+			class="size-8 rounded-lg px-0 text-xs font-semibold"
+			onclick={() => addWater(waterIncrement)}
 		>
-			+{waterSmallAmount}
-		</Button>
-		<Button
-			size="sm"
-			variant="outline"
-			class="h-8 rounded-lg px-2 text-xs font-semibold"
-			onclick={() => addWater(waterLargeAmount)}
-		>
-			+{waterLargeAmount}
+			+
 		</Button>
 	</div>
 </div>
